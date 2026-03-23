@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../providers/clawd_state_provider.dart';
 import '../theme/tva_colors.dart';
+import 'clawd/clawd_animator.dart';
 
 class AppShell extends StatelessWidget {
   final Widget child;
@@ -19,9 +22,22 @@ class AppShell extends StatelessWidget {
             height: 52,
             color: TvaColors.bgInset,
             padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: const Row(
+            child: Row(
               children: [
-                Text(
+                Consumer(
+                  builder: (context, ref, _) {
+                    final clawdState = ref.watch(clawdStateProvider);
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 10),
+                      child: ClawdAnimator(
+                        state: clawdState,
+                        cellWidth: 3,
+                        cellHeight: 7,
+                      ),
+                    );
+                  },
+                ),
+                const Text(
                   'PINCH',
                   style: TextStyle(
                     color: TvaColors.clawd,
@@ -30,8 +46,8 @@ class AppShell extends StatelessWidget {
                     fontSize: 14,
                   ),
                 ),
-                Spacer(),
-                Text(
+                const Spacer(),
+                const Text(
                   'CONNECTED',
                   style: TextStyle(
                     color: TvaColors.greenBr,
