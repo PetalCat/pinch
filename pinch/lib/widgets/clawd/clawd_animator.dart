@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/tva_colors.dart';
+import 'clawd_props.dart';
 import 'clawd_sprite.dart';
 import 'clawd_state.dart';
 
@@ -8,12 +9,14 @@ class ClawdAnimator extends StatefulWidget {
   final ClawdState state;
   final double cellWidth;
   final double cellHeight;
+  final VoidCallback? onWalkComplete;
 
   const ClawdAnimator({
     super.key,
     this.state = ClawdState.idle,
     this.cellWidth = 6.0,
     this.cellHeight = 13.0,
+    this.onWalkComplete,
   });
 
   @override
@@ -31,6 +34,9 @@ class _ClawdAnimatorState extends State<ClawdAnimator>
 
   // For thinking eye color cycle
   late AnimationController _colorCycleController;
+
+  // For walk transitions
+  late AnimationController _walkController;
 
   @override
   void initState() {
@@ -61,6 +67,16 @@ class _ClawdAnimatorState extends State<ClawdAnimator>
       duration: const Duration(seconds: 3),
     );
 
+    _walkController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+    _walkController.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        widget.onWalkComplete?.call();
+      }
+    });
+
     _applyState();
   }
 
@@ -80,6 +96,8 @@ class _ClawdAnimatorState extends State<ClawdAnimator>
     _hopController.reset();
     _colorCycleController.stop();
     _colorCycleController.reset();
+    _walkController.stop();
+    _walkController.reset();
 
     switch (widget.state) {
       case ClawdState.idle:
@@ -110,6 +128,7 @@ class _ClawdAnimatorState extends State<ClawdAnimator>
       case ClawdState.walkingOn:
         _bobController.duration = const Duration(milliseconds: 300);
         _bobController.repeat();
+        _walkController.forward(from: 0);
 
       case ClawdState.hidden:
         _bobController.stop();
@@ -123,6 +142,7 @@ class _ClawdAnimatorState extends State<ClawdAnimator>
     _shakeController.dispose();
     _hopController.dispose();
     _colorCycleController.dispose();
+    _walkController.dispose();
     super.dispose();
   }
 
@@ -167,6 +187,14 @@ class _ClawdAnimatorState extends State<ClawdAnimator>
   }
 
   double _translateX() {
+    if (widget.state == ClawdState.walkingOff) {
+      final step = (_walkController.value * 5).floor().clamp(0, 4);
+      return -step * 8.0;
+    }
+    if (widget.state == ClawdState.walkingOn) {
+      final step = (_walkController.value * 5).floor().clamp(0, 4);
+      return -40.0 + (step * 8.0);
+    }
     if (widget.state == ClawdState.error) {
       // Shake: snap between -1 and +1
       final v = _shakeController.value;
@@ -179,6 +207,13 @@ class _ClawdAnimatorState extends State<ClawdAnimator>
   }
 
   double _translateY() {
+    if (widget.state == ClawdState.walkingOff ||
+        widget.state == ClawdState.walkingOn) {
+      final yBob =
+          (_walkController.value * 10 % 2 < 1) ? -2.0 : 0.0;
+      return yBob;
+    }
+
     if (widget.state == ClawdState.success) {
       // Hop: snap to -3px in first half, back to 0 in second half
       final v = _hopController.value;
@@ -195,6 +230,31 @@ class _ClawdAnimatorState extends State<ClawdAnimator>
     return v < 0.5 ? 0.0 : -1.0;
   }
 
+  double _walkOpacity() {
+    if (widget.state == ClawdState.walkingOff) {
+      final step = (_walkController.value * 5).floor().clamp(0, 4);
+      return 1.0 - (step / 5);
+    }
+    if (widget.state == ClawdState.walkingOn) {
+      final step = (_walkController.value * 5).floor().clamp(0, 4);
+      return step / 5;
+    }
+    return 1.0;
+  }
+
+  Widget? _buildProp() {
+    switch (widget.state) {
+      case ClawdState.reading:
+        return const ReadProp();
+      case ClawdState.editing:
+        return const EditProp();
+      case ClawdState.bash:
+        return const BashProp();
+      default:
+        return null;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (widget.state == ClawdState.hidden) {
@@ -204,26 +264,50 @@ class _ClawdAnimatorState extends State<ClawdAnimator>
       );
     }
 
-    return ListenableBuilder(
-      listenable: Listenable.merge([
-        _bobController,
-        _blinkController,
-        _shakeController,
-        _hopController,
-        _colorCycleController,
-      ]),
-      builder: (context, _) {
-        return Transform.translate(
-          offset: Offset(_translateX(), _translateY()),
-          child: ClawdSprite(
-            cellWidth: widget.cellWidth,
-            cellHeight: widget.cellHeight,
-            glowColor: _glowColor(),
-            eyeColor: _eyeColor(),
-            showEyes: _showEyes(),
-          ),
-        );
-      },
+    return SizedBox(
+      width: 100,
+      height: widget.cellHeight * 5,
+      child: ListenableBuilder(
+        listenable: Listenable.merge([
+          _bobController,
+          _blinkController,
+          _shakeController,
+          _hopController,
+          _colorCycleController,
+          _walkController,
+        ]),
+        builder: (context, _) {
+          final opacity = _walkOpacity();
+          final prop = _buildProp();
+
+          return Opacity(
+            opacity: opacity.clamp(0.0, 1.0),
+            child: Transform.translate(
+              offset: Offset(_translateX(), _translateY()),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  ClawdSprite(
+                    cellWidth: widget.cellWidth,
+                    cellHeight: widget.cellHeight,
+                    glowColor: _glowColor(),
+                    eyeColor: _eyeColor(),
+                    showEyes: _showEyes(),
+                  ),
+                  if (prop != null) ...[
+                    const SizedBox(width: 4),
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 200),
+                      child: prop,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 }
