@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import 'tva_colors.dart';
 
@@ -7,8 +6,8 @@ class TvaTheme {
   TvaTheme._();
 
   static ThemeData get dark {
-    final mono = GoogleFonts.ibmPlexMono();
-    final sans = GoogleFonts.ibmPlexSans();
+    const mono = TextStyle(fontFamily: 'IBMPlexMono');
+    const sans = TextStyle(fontFamily: 'IBMPlexSans');
 
     final textTheme = TextTheme(
       headlineLarge: sans.copyWith(

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../providers/clawd_state_provider.dart';
 import '../theme/tva_colors.dart';
@@ -12,7 +11,7 @@ class Masthead extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final clawdState = ref.watch(clawdStateProvider);
-    final mono = GoogleFonts.ibmPlexMono();
+    const mono = TextStyle(fontFamily: 'IBMPlexMono');
 
     return Container(
       height: 52,
