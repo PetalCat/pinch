@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../providers/clawd_state_provider.dart';
 import '../theme/tva_colors.dart';
-import 'clawd/clawd_animator.dart';
+import 'masthead.dart';
+import 'rail.dart';
 
 class AppShell extends StatelessWidget {
   final Widget child;
@@ -17,48 +16,7 @@ class AppShell extends StatelessWidget {
       backgroundColor: TvaColors.bg,
       body: Column(
         children: [
-          // Masthead placeholder
-          Container(
-            height: 52,
-            color: TvaColors.bgInset,
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Row(
-              children: [
-                Consumer(
-                  builder: (context, ref, _) {
-                    final clawdState = ref.watch(clawdStateProvider);
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 10),
-                      child: ClawdAnimator(
-                        state: clawdState,
-                        cellWidth: 3,
-                        cellHeight: 7,
-                      ),
-                    );
-                  },
-                ),
-                const Text(
-                  'PINCH',
-                  style: TextStyle(
-                    color: TvaColors.clawd,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 3,
-                    fontSize: 14,
-                  ),
-                ),
-                const Spacer(),
-                const Text(
-                  'CONNECTED',
-                  style: TextStyle(
-                    color: TvaColors.greenBr,
-                    fontSize: 10,
-                    fontFamily: 'monospace',
-                    letterSpacing: 1,
-                  ),
-                ),
-              ],
-            ),
-          ),
+          const Masthead(),
           Container(height: 1, color: TvaColors.brd),
           // Ticker placeholder
           Container(
@@ -82,27 +40,7 @@ class AppShell extends StatelessWidget {
             child: isDesktop
                 ? Row(
                     children: [
-                      // Rail placeholder
-                      Container(
-                        width: 56,
-                        color: TvaColors.bgInset,
-                        child: Column(
-                          children: [
-                            const SizedBox(height: 12),
-                            _railItem('H', true),
-                            const SizedBox(height: 6),
-                            Container(
-                              width: 20,
-                              height: 1,
-                              color: TvaColors.brd,
-                            ),
-                            const SizedBox(height: 6),
-                            _railItem('SC', false),
-                            const SizedBox(height: 6),
-                            _railItem('AP', false),
-                          ],
-                        ),
-                      ),
+                      const Rail(),
                       Container(width: 1, color: TvaColors.brd),
                       // Sidebar placeholder
                       Container(
@@ -135,29 +73,6 @@ class AppShell extends StatelessWidget {
                 : child,
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _railItem(String label, bool active) {
-    return Container(
-      width: 36,
-      height: 36,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: active ? TvaColors.bgRaised : TvaColors.bgPanel,
-        border: Border.all(
-          color: active ? TvaColors.clawdDk : TvaColors.brd,
-        ),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: active ? TvaColors.clawd : TvaColors.txt3,
-          fontSize: 10,
-          fontWeight: FontWeight.w600,
-          fontFamily: 'monospace',
-        ),
       ),
     );
   }
