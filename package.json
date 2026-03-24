@@ -1,0 +1,15 @@
+{
+  "name": "project-docs",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A beautiful reader for project specs, plans, and mockups",
+  "scripts": {
+    "start": "node server.js",
+    "build": "node build.js",
+    "tauri": "cargo tauri"
+  },
+  "dependencies": {
+    "uuid": "^13.0.0",
+    "ws": "^8.20.0"
+  }
+}
