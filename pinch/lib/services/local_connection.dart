@@ -197,4 +197,26 @@ class LocalConnection implements ConnectionService {
       return [];
     }
   }
+
+  @override
+  Future<List<Map<String, dynamic>>> getHistoricalSessions() async {
+    try {
+      final resp = await _dio.get('/api/history');
+      return (resp.data as List).cast<Map<String, dynamic>>();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  @override
+  Future<List<SessionEvent>> getHistoricalSession(String sessionId) async {
+    try {
+      final resp = await _dio.get('/api/history/$sessionId');
+      return (resp.data as List)
+          .map((j) => SessionEvent.fromJson(j as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
 }

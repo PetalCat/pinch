@@ -23,6 +23,8 @@ abstract class ConnectionService {
   Future<List<Document>> getDocs(String projectId);
   Future<String> readDocument(String projectId, String docPath);
   Future<List<SessionEvent>> getSessionHistory(String sessionId);
+  Future<List<Map<String, dynamic>>> getHistoricalSessions();
+  Future<List<SessionEvent>> getHistoricalSession(String sessionId);
   Future<String> createSessionWithOptions(SessionOptions options);
   Future<List<Project>> discoverProjects();
   Future<void> setActiveProject(String directory);

@@ -142,4 +142,10 @@ class MockConnectionService implements ConnectionService {
 
   @override
   Future<void> setActiveProject(String directory) async {}
+
+  @override
+  Future<List<Map<String, dynamic>>> getHistoricalSessions() async => [];
+
+  @override
+  Future<List<SessionEvent>> getHistoricalSession(String sessionId) async => [];
 }
