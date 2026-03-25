@@ -135,7 +135,7 @@ class HistoryScreen extends ConsumerWidget {
         : projectName.toUpperCase();
 
     return GestureDetector(
-      onTap: () => context.go('/history/${session['id']}'),
+      onTap: () => context.go('/session/${session['id']}?historical=true'),
       child: Container(
         padding: const EdgeInsets.all(12),
         margin: const EdgeInsets.only(bottom: 6),

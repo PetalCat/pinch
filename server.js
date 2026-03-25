@@ -600,6 +600,7 @@ function createClaudeSession(ws, options) {
   if (options.mcpConfig) args.push('--mcp-config', options.mcpConfig);
   if (options.worktree) args.push('--worktree');
   if (options.sessionName) args.push('--name', options.sessionName);
+  if (options.resumeSessionId) args.push('--resume', options.resumeSessionId);
 
   const { spawn } = require('child_process');
   const proc = spawn('claude', args, {

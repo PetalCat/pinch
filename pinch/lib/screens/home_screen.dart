@@ -310,7 +310,7 @@ class _HistoryCard extends StatelessWidget {
     final timeAgo = _formatTimeAgo(session['lastModified'] as String? ?? '');
 
     return GestureDetector(
-      onTap: () => context.go('/history/${session['id']}'),
+      onTap: () => context.go('/session/${session['id']}?historical=true'),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         margin: const EdgeInsets.only(bottom: 4),

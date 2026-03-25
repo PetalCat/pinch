@@ -222,7 +222,7 @@ class _SidebarState extends ConsumerState<Sidebar>
     final sessionId = session['id'] as String? ?? '';
 
     return GestureDetector(
-      onTap: () => GoRouter.of(context).go('/history/$sessionId'),
+      onTap: () => GoRouter.of(context).go('/session/$sessionId?historical=true'),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
         margin: const EdgeInsets.only(bottom: 3),
