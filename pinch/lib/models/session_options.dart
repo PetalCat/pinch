@@ -21,6 +21,7 @@ class SessionOptions with _$SessionOptions {
     String? mcpConfig,
     @Default(false) bool worktree,
     String? sessionName,
+    String? resumeSessionId,
   }) = _SessionOptions;
 
   factory SessionOptions.fromJson(Map<String, dynamic> json) =>

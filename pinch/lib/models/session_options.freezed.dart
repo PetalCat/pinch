@@ -37,6 +37,7 @@ mixin _$SessionOptions {
   String? get mcpConfig => throw _privateConstructorUsedError;
   bool get worktree => throw _privateConstructorUsedError;
   String? get sessionName => throw _privateConstructorUsedError;
+  String? get resumeSessionId => throw _privateConstructorUsedError;
 
   /// Serializes this SessionOptions to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -71,6 +72,7 @@ abstract class $SessionOptionsCopyWith<$Res> {
     String? mcpConfig,
     bool worktree,
     String? sessionName,
+    String? resumeSessionId,
   });
 }
 
@@ -104,6 +106,7 @@ class _$SessionOptionsCopyWithImpl<$Res, $Val extends SessionOptions>
     Object? mcpConfig = freezed,
     Object? worktree = null,
     Object? sessionName = freezed,
+    Object? resumeSessionId = freezed,
   }) {
     return _then(
       _value.copyWith(
@@ -168,6 +171,10 @@ class _$SessionOptionsCopyWithImpl<$Res, $Val extends SessionOptions>
                 ? _value.sessionName
                 : sessionName // ignore: cast_nullable_to_non_nullable
                       as String?,
+            resumeSessionId: freezed == resumeSessionId
+                ? _value.resumeSessionId
+                : resumeSessionId // ignore: cast_nullable_to_non_nullable
+                      as String?,
           )
           as $Val,
     );
@@ -199,6 +206,7 @@ abstract class _$$SessionOptionsImplCopyWith<$Res>
     String? mcpConfig,
     bool worktree,
     String? sessionName,
+    String? resumeSessionId,
   });
 }
 
@@ -231,6 +239,7 @@ class __$$SessionOptionsImplCopyWithImpl<$Res>
     Object? mcpConfig = freezed,
     Object? worktree = null,
     Object? sessionName = freezed,
+    Object? resumeSessionId = freezed,
   }) {
     return _then(
       _$SessionOptionsImpl(
@@ -294,6 +303,10 @@ class __$$SessionOptionsImplCopyWithImpl<$Res>
             ? _value.sessionName
             : sessionName // ignore: cast_nullable_to_non_nullable
                   as String?,
+        resumeSessionId: freezed == resumeSessionId
+            ? _value.resumeSessionId
+            : resumeSessionId // ignore: cast_nullable_to_non_nullable
+                  as String?,
       ),
     );
   }
@@ -318,6 +331,7 @@ class _$SessionOptionsImpl implements _SessionOptions {
     this.mcpConfig,
     this.worktree = false,
     this.sessionName,
+    this.resumeSessionId,
   }) : _allowedTools = allowedTools,
        _disallowedTools = disallowedTools,
        _addDirs = addDirs;
@@ -379,10 +393,12 @@ class _$SessionOptionsImpl implements _SessionOptions {
   final bool worktree;
   @override
   final String? sessionName;
+  @override
+  final String? resumeSessionId;
 
   @override
   String toString() {
-    return 'SessionOptions(projectDir: $projectDir, model: $model, permissionMode: $permissionMode, dangerouslySkipPermissions: $dangerouslySkipPermissions, allowDangerouslySkipPermissions: $allowDangerouslySkipPermissions, allowedTools: $allowedTools, disallowedTools: $disallowedTools, systemPrompt: $systemPrompt, appendSystemPrompt: $appendSystemPrompt, effort: $effort, maxBudget: $maxBudget, addDirs: $addDirs, mcpConfig: $mcpConfig, worktree: $worktree, sessionName: $sessionName)';
+    return 'SessionOptions(projectDir: $projectDir, model: $model, permissionMode: $permissionMode, dangerouslySkipPermissions: $dangerouslySkipPermissions, allowDangerouslySkipPermissions: $allowDangerouslySkipPermissions, allowedTools: $allowedTools, disallowedTools: $disallowedTools, systemPrompt: $systemPrompt, appendSystemPrompt: $appendSystemPrompt, effort: $effort, maxBudget: $maxBudget, addDirs: $addDirs, mcpConfig: $mcpConfig, worktree: $worktree, sessionName: $sessionName, resumeSessionId: $resumeSessionId)';
   }
 
   @override
@@ -428,7 +444,9 @@ class _$SessionOptionsImpl implements _SessionOptions {
             (identical(other.worktree, worktree) ||
                 other.worktree == worktree) &&
             (identical(other.sessionName, sessionName) ||
-                other.sessionName == sessionName));
+                other.sessionName == sessionName) &&
+            (identical(other.resumeSessionId, resumeSessionId) ||
+                other.resumeSessionId == resumeSessionId));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -450,6 +468,7 @@ class _$SessionOptionsImpl implements _SessionOptions {
     mcpConfig,
     worktree,
     sessionName,
+    resumeSessionId,
   );
 
   /// Create a copy of SessionOptions
@@ -486,6 +505,7 @@ abstract class _SessionOptions implements SessionOptions {
     final String? mcpConfig,
     final bool worktree,
     final String? sessionName,
+    final String? resumeSessionId,
   }) = _$SessionOptionsImpl;
 
   factory _SessionOptions.fromJson(Map<String, dynamic> json) =
@@ -521,6 +541,8 @@ abstract class _SessionOptions implements SessionOptions {
   bool get worktree;
   @override
   String? get sessionName;
+  @override
+  String? get resumeSessionId;
 
   /// Create a copy of SessionOptions
   /// with the given fields replaced by the non-null parameter values.

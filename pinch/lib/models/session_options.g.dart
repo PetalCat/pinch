@@ -37,6 +37,7 @@ _$SessionOptionsImpl _$$SessionOptionsImplFromJson(Map<String, dynamic> json) =>
       mcpConfig: json['mcpConfig'] as String?,
       worktree: json['worktree'] as bool? ?? false,
       sessionName: json['sessionName'] as String?,
+      resumeSessionId: json['resumeSessionId'] as String?,
     );
 
 Map<String, dynamic> _$$SessionOptionsImplToJson(
@@ -57,4 +58,5 @@ Map<String, dynamic> _$$SessionOptionsImplToJson(
   'mcpConfig': instance.mcpConfig,
   'worktree': instance.worktree,
   'sessionName': instance.sessionName,
+  'resumeSessionId': instance.resumeSessionId,
 };
