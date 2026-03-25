@@ -26,11 +26,12 @@ ClawdState clawdStateFromEvent(EventType type) {
   return switch (type) {
     EventType.assistantThinking => ClawdState.thinking,
     EventType.assistantText => ClawdState.typing,
-    EventType.toolUse => ClawdState.editing,
-    EventType.toolResult => ClawdState.reading,
+    EventType.toolUse => ClawdState.reading, // will be refined by toolName
+    EventType.toolResult => ClawdState.success,
     EventType.permissionRequest => ClawdState.idle,
     EventType.error => ClawdState.error,
-    EventType.sessionEnd => ClawdState.success,
+    EventType.sessionEnd => ClawdState.idle,
+    EventType.userMessage => ClawdState.idle,
     _ => ClawdState.idle,
   };
 }

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../models/session_event.dart';
+import '../models/session_options.dart';
 import '../models/session.dart';
 import '../models/project.dart';
 import '../models/document.dart';
@@ -147,7 +148,27 @@ class LocalConnection implements ConnectionService {
   }
 
   @override
+  Stream<SessionEvent> get eventStream => _eventController.stream;
+
+  @override
+  Future<String> createSessionWithOptions(SessionOptions options) async {
+    final sessionId = DateTime.now().millisecondsSinceEpoch.toString();
+    _ws?.sink.add(jsonEncode({
+      'action': 'createSession',
+      'options': options.toJson(),
+    }));
+    return sessionId;
+  }
+
+  @override
   Future<List<SessionEvent>> getSessionHistory(String sessionId) async {
-    return []; // Not implemented yet on server
+    try {
+      final resp = await _dio.get('/api/sessions/$sessionId/events');
+      return (resp.data as List)
+          .map((j) => SessionEvent.fromJson(j as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      return [];
+    }
   }
 }

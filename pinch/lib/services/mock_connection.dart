@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import '../models/session_event.dart';
+import '../models/session_options.dart';
 import '../models/session.dart';
 import '../models/project.dart';
 import '../models/document.dart';
@@ -113,4 +114,12 @@ class MockConnectionService implements ConnectionService {
       {bool always = false}) async {}
   @override
   Future<List<SessionEvent>> getSessionHistory(String sessionId) async => [];
+
+  @override
+  Stream<SessionEvent> get eventStream => const Stream.empty();
+
+  @override
+  Future<String> createSessionWithOptions(SessionOptions options) async {
+    return 'mock-${DateTime.now().millisecondsSinceEpoch}';
+  }
 }

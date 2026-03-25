@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/session_event.dart';
+import '../models/session_options.dart';
 import '../models/session.dart';
 import '../models/project.dart';
 import '../models/document.dart';
@@ -22,6 +23,8 @@ abstract class ConnectionService {
   Future<List<Document>> getDocs(String projectId);
   Future<String> readDocument(String projectId, String docPath);
   Future<List<SessionEvent>> getSessionHistory(String sessionId);
+  Future<String> createSessionWithOptions(SessionOptions options);
+  Stream<SessionEvent> get eventStream;
 }
 
 final connectionServiceProvider = Provider<ConnectionService>((ref) {
