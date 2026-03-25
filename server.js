@@ -247,6 +247,36 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── Pinch Session REST API ──
+
+  if (url.pathname === '/api/sessions' && req.method === 'GET') {
+    const list = [];
+    for (const [id, s] of sessions) {
+      list.push({ id, projectId: 'current', name: s.options.sessionName || 'Session', status: s.status, createdAt: new Date(s.startedAt).toISOString(), model: s.options.model || 'default' });
+    }
+    return json(res, list);
+  }
+  if (url.pathname.match(/^\/api\/sessions\/[^/]+$/) && req.method === 'GET') {
+    const id = url.pathname.split('/').pop();
+    const s = sessions.get(id);
+    if (!s) return json(res, { error: 'Not found' }, 404);
+    return json(res, { id, status: s.status, options: s.options, startedAt: new Date(s.startedAt).toISOString(), eventCount: s.events.length });
+  }
+  if (url.pathname.match(/^\/api\/sessions\/[^/]+\/stop$/) && req.method === 'POST') {
+    const id = url.pathname.split('/')[3];
+    stopSession(id);
+    return json(res, { stopped: true });
+  }
+  if (url.pathname.match(/^\/api\/sessions\/[^/]+\/events$/) && req.method === 'GET') {
+    const id = url.pathname.split('/')[3];
+    const s = sessions.get(id);
+    if (!s) return json(res, { error: 'Not found' }, 404);
+    return json(res, s.events);
+  }
+  if (url.pathname === '/api/health' && req.method === 'GET') {
+    return json(res, { status: 'ok', uptime: process.uptime(), activeSessions: [...sessions.values()].filter(s => s.status === 'active').length, totalSessions: sessions.size });
+  }
+
   // Serve frontend
   if (url.pathname === '/' || url.pathname === '/index.html') {
     const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf-8');
@@ -416,67 +446,160 @@ server.listen(PORT, () => {
   console.log();
 });
 
+// ── Session Manager ──
+const sessions = new Map();
+
+function createClaudeSession(ws, options) {
+  const sessionId = uuidv4();
+  const args = ['--print', '--output-format', 'stream-json', '--input-format', 'stream-json'];
+
+  if (options.model) args.push('--model', options.model);
+  if (options.permissionMode) args.push('--permission-mode', options.permissionMode);
+  if (options.dangerouslySkipPermissions) args.push('--dangerously-skip-permissions');
+  if (options.allowDangerouslySkipPermissions) args.push('--allow-dangerously-skip-permissions');
+  if (options.allowedTools && options.allowedTools.length) args.push('--allowed-tools', ...options.allowedTools);
+  if (options.disallowedTools && options.disallowedTools.length) args.push('--disallowed-tools', ...options.disallowedTools);
+  if (options.systemPrompt) args.push('--system-prompt', options.systemPrompt);
+  if (options.appendSystemPrompt) args.push('--append-system-prompt', options.appendSystemPrompt);
+  if (options.effort) args.push('--effort', options.effort);
+  if (options.maxBudget) args.push('--max-budget-usd', String(options.maxBudget));
+  if (options.addDirs && options.addDirs.length) {
+    for (const dir of options.addDirs) args.push('--add-dir', dir);
+  }
+  if (options.mcpConfig) args.push('--mcp-config', options.mcpConfig);
+  if (options.worktree) args.push('--worktree');
+  if (options.sessionName) args.push('--name', options.sessionName);
+
+  const { spawn } = require('child_process');
+  const proc = spawn('claude', args, {
+    cwd: options.projectDir || process.cwd(),
+    env: { ...process.env },
+  });
+
+  const session = { id: sessionId, proc, options, events: [], status: 'active', startedAt: Date.now(), ws };
+  sessions.set(sessionId, session);
+
+  // Send session start
+  const startEvent = {
+    id: uuidv4(), sessionId, timestamp: new Date().toISOString(),
+    type: 'sessionStart',
+    data: { model: options.model || 'default', projectDir: options.projectDir, sessionName: options.sessionName || 'New Session' },
+  };
+  session.events.push(startEvent);
+  sendToClient(ws, startEvent);
+
+  // Parse stdout line-by-line
+  let buffer = '';
+  proc.stdout.on('data', (chunk) => {
+    buffer += chunk.toString();
+    const lines = buffer.split('\n');
+    buffer = lines.pop();
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      try {
+        const parsed = JSON.parse(line);
+        const event = mapClaudeEvent(sessionId, parsed);
+        if (event) {
+          session.events.push(event);
+          sendToClient(ws, event);
+        }
+      } catch (e) { /* skip non-JSON */ }
+    }
+  });
+
+  proc.stderr.on('data', (chunk) => {
+    const errText = chunk.toString().trim();
+    if (errText) {
+      const errEvent = { id: uuidv4(), sessionId, timestamp: new Date().toISOString(), type: 'error', data: { message: errText } };
+      session.events.push(errEvent);
+      sendToClient(ws, errEvent);
+    }
+  });
+
+  proc.on('exit', (code) => {
+    session.status = 'ended';
+    const endEvent = { id: uuidv4(), sessionId, timestamp: new Date().toISOString(), type: 'sessionEnd', data: { reason: code === 0 ? 'completed' : 'error', totalTokens: 0, cost: 0 } };
+    session.events.push(endEvent);
+    sendToClient(ws, endEvent);
+  });
+
+  return sessionId;
+}
+
+function mapClaudeEvent(sessionId, parsed) {
+  const id = uuidv4();
+  const timestamp = new Date().toISOString();
+  const type = parsed.type || '';
+
+  if (type === 'system') return { id, sessionId, timestamp, type: 'sessionStart', data: parsed };
+  if (type === 'assistant' && parsed.subtype === 'thinking') return { id, sessionId, timestamp, type: 'assistantThinking', data: { thinking: parsed.content || '', done: parsed.done || false } };
+  if (type === 'assistant' && parsed.subtype === 'text') return { id, sessionId, timestamp, type: 'assistantText', data: { text: parsed.content || '', done: parsed.done || false } };
+  if (type === 'assistant') return { id, sessionId, timestamp, type: 'assistantText', data: { text: parsed.content || JSON.stringify(parsed), done: parsed.done !== false } };
+  if (type === 'tool_use') return { id, sessionId, timestamp, type: 'toolUse', data: { toolName: parsed.name || 'Unknown', input: parsed.input || {}, toolUseId: parsed.tool_use_id || uuidv4() } };
+  if (type === 'tool_result') return { id, sessionId, timestamp, type: 'toolResult', data: { toolUseId: parsed.tool_use_id || '', success: !parsed.is_error, output: parsed.content || '', duration: 0 } };
+  if (type === 'result') return { id, sessionId, timestamp, type: 'sessionEnd', data: { reason: 'completed', totalTokens: parsed.usage?.total_tokens || 0, cost: parsed.cost || 0 } };
+  if (type === 'error') return { id, sessionId, timestamp, type: 'error', data: { message: parsed.message || parsed.error || JSON.stringify(parsed) } };
+  return { id, sessionId, timestamp, type: 'assistantText', data: { text: JSON.stringify(parsed), done: true } };
+}
+
+function sendToClient(ws, event) {
+  if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(event));
+}
+
+function stopSession(sessionId) {
+  const session = sessions.get(sessionId);
+  if (!session || session.status === 'ended') return;
+  session.proc.kill('SIGTERM');
+  setTimeout(() => { try { session.proc.kill('SIGKILL'); } catch (_) {} }, 5000);
+}
+
 // ── Pinch WebSocket ──
 
 const wss = new WebSocket.Server({ server, path: '/ws' });
 
 wss.on('connection', (ws) => {
   console.log('Pinch client connected');
-
   ws.on('message', (data) => {
-    let msg;
-    try { msg = JSON.parse(data.toString()); } catch { return; }
-
-    switch (msg.action) {
-      case 'prompt':
-        handlePrompt(ws, msg);
-        break;
-      case 'createSession':
-        ws.send(JSON.stringify({
-          id: uuidv4(),
-          sessionId: uuidv4(),
-          timestamp: new Date().toISOString(),
-          type: 'sessionStart',
-          data: { model: 'opus-4.6', projectDir: msg.projectDir, sessionName: msg.name || 'New Session' },
-        }));
-        break;
-      case 'stop':
-        ws.send(JSON.stringify({
-          id: uuidv4(),
-          sessionId: msg.sessionId,
-          timestamp: new Date().toISOString(),
-          type: 'sessionEnd',
-          data: { reason: 'stopped', totalTokens: 0, cost: 0 },
-        }));
-        break;
-      case 'permission':
-        // Acknowledge
-        break;
-    }
+    try {
+      const msg = JSON.parse(data.toString());
+      switch (msg.action) {
+        case 'createSession': {
+          const sid = createClaudeSession(ws, msg.options || { projectDir: msg.projectDir });
+          break;
+        }
+        case 'prompt': {
+          const session = sessions.get(msg.sessionId);
+          if (session && session.proc && session.status === 'active') {
+            session.proc.stdin.write(JSON.stringify({ type: 'user', content: msg.text }) + '\n');
+            const userEvent = { id: uuidv4(), sessionId: msg.sessionId, timestamp: new Date().toISOString(), type: 'userMessage', data: { text: msg.text } };
+            session.events.push(userEvent);
+            sendToClient(ws, userEvent);
+          }
+          break;
+        }
+        case 'stop':
+          stopSession(msg.sessionId);
+          break;
+        case 'permission': {
+          const s = sessions.get(msg.sessionId);
+          if (s && s.proc) {
+            s.proc.stdin.write(JSON.stringify({ type: 'permission_response', tool_use_id: msg.toolUseId, allowed: msg.allowed }) + '\n');
+          }
+          break;
+        }
+      }
+    } catch (e) { console.error('WS message error:', e.message); }
   });
-
   ws.on('close', () => console.log('Pinch client disconnected'));
 });
 
-function handlePrompt(ws, msg) {
-  const sessionId = msg.sessionId;
-  const events = [
-    { type: 'assistantThinking', data: { thinking: 'Let me think about this...', done: true } },
-    { type: 'assistantText', data: { text: `I received your prompt: "${msg.text}". This is a mock response from the server.`, done: true } },
-  ];
-
-  let delay = 500;
-  for (const evt of events) {
-    setTimeout(() => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({
-          id: uuidv4(),
-          sessionId,
-          timestamp: new Date().toISOString(),
-          ...evt,
-        }));
-      }
-    }, delay);
-    delay += 1000;
-  }
-}
+process.on('SIGTERM', () => {
+  console.log('Shutting down');
+  for (const [id] of sessions) stopSession(id);
+  server.close(() => process.exit(0));
+});
+process.on('SIGINT', () => {
+  console.log('Shutting down');
+  for (const [id] of sessions) stopSession(id);
+  server.close(() => process.exit(0));
+});
