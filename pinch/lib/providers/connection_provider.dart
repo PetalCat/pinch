@@ -27,6 +27,7 @@ abstract class ConnectionService {
   Future<List<SessionEvent>> getHistoricalSession(String sessionId);
   Future<String> createSessionWithOptions(SessionOptions options);
   Future<List<Project>> discoverProjects();
+  Future<List<Project>> getMyProjects();
   Future<void> setActiveProject(String directory);
   Stream<SessionEvent> get eventStream;
 }

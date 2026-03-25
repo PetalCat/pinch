@@ -194,6 +194,165 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── Accounts (foundation) ──
+  // For now, single admin account. Structure supports future multi-user.
+  const DEFAULT_USER = { id: 'admin', name: 'Admin', role: 'admin' };
+
+  function getCurrentUser(req) {
+    // Future: parse auth header/token
+    return DEFAULT_USER;
+  }
+
+  // GET /api/me — current user info
+  if (url.pathname === '/api/me' && req.method === 'GET') {
+    return json(res, getCurrentUser(req));
+  }
+
+  // GET /api/my-projects — merged: scanned + history, deduplicated, user-scoped
+  if (url.pathname === '/api/my-projects' && req.method === 'GET') {
+    const user = getCurrentUser(req);
+    const projectMap = new Map(); // directory → project info
+
+    // Source 1: Session history from ~/.claude/projects/
+    const claudeDir2 = path.join(os.homedir(), '.claude', 'projects');
+    if (fs.existsSync(claudeDir2)) {
+      for (const folder of fs.readdirSync(claudeDir2)) {
+        const folderPath = path.join(claudeDir2, folder);
+        if (!fs.statSync(folderPath).isDirectory()) continue;
+
+        const sessions = fs.readdirSync(folderPath).filter(f => f.endsWith('.jsonl') && f.match(/^[0-9a-f]{8}-/));
+        if (sessions.length === 0) continue;
+
+        const projectDir = '/' + folder.replace(/-/g, '/');
+        if (projectDir.startsWith('/ssh/')) continue; // skip remote sessions
+
+        const projectName = folder.split('-').pop() || folder;
+
+        let lastModified = 0;
+        for (const s of sessions) {
+          try {
+            const mt = fs.statSync(path.join(folderPath, s)).mtimeMs;
+            if (mt > lastModified) lastModified = mt;
+          } catch {}
+        }
+
+        // Check if directory still exists on disk
+        const dirExists = fs.existsSync(projectDir);
+
+        projectMap.set(projectDir, {
+          id: folder,
+          name: projectName,
+          directory: projectDir,
+          shortCode: projectName.length >= 2 ? projectName.substring(0, 2).toUpperCase() : projectName.toUpperCase(),
+          sessionCount: sessions.length,
+          lastActive: new Date(lastModified).toISOString(),
+          source: 'history',
+          hasSpecs: false,
+          hasPlans: false,
+          hasBrainstorm: false,
+          hasFindings: false,
+          exists: dirExists,
+        });
+      }
+    }
+
+    // Source 2: Scan for docs/superpowers structure (only dirs that exist)
+    const home2 = os.homedir();
+    const searchRoots2 = ['Developer','Projects','Documents','Code','dev','src','repos','workspace','Work','Desktop']
+      .map(d => path.join(home2, d));
+
+    function checkDocStructure(dir) {
+      return {
+        hasSpecs: fs.existsSync(path.join(dir, 'docs', 'superpowers', 'specs')),
+        hasPlans: fs.existsSync(path.join(dir, 'docs', 'superpowers', 'plans')),
+        hasBrainstorm: fs.existsSync(path.join(dir, '.superpowers', 'brainstorm')),
+        hasFindings: (() => { try { return fs.existsSync(path.join(dir, 'docs')) && fs.readdirSync(path.join(dir, 'docs')).some(f => f.endsWith('.md')); } catch { return false; } })(),
+      };
+    }
+
+    for (const root of searchRoots2) {
+      if (!fs.existsSync(root)) continue;
+      try {
+        const entries = fs.readdirSync(root);
+        for (const entry of entries) {
+          if (entry.startsWith('.')) continue;
+          const p = path.join(root, entry);
+          try { if (!fs.statSync(p).isDirectory()) continue; } catch { continue; }
+
+          const docs = checkDocStructure(p);
+          if (docs.hasSpecs || docs.hasPlans || docs.hasBrainstorm) {
+            const existing = projectMap.get(p);
+            if (existing) {
+              // Merge: add doc info to existing history entry
+              existing.hasSpecs = docs.hasSpecs;
+              existing.hasPlans = docs.hasPlans;
+              existing.hasBrainstorm = docs.hasBrainstorm;
+              existing.hasFindings = docs.hasFindings;
+              existing.source = 'both';
+            } else {
+              projectMap.set(p, {
+                id: p.replace(/\//g, '-').replace(/^-/, ''),
+                name: path.basename(p),
+                directory: p,
+                shortCode: path.basename(p).substring(0, 2).toUpperCase(),
+                sessionCount: 0,
+                lastActive: null,
+                source: 'scan',
+                ...docs,
+                exists: true,
+              });
+            }
+          }
+
+          // Check one level deeper
+          try {
+            for (const sub of fs.readdirSync(p)) {
+              if (sub.startsWith('.')) continue;
+              const sp = path.join(p, sub);
+              try { if (!fs.statSync(sp).isDirectory()) continue; } catch { continue; }
+              const sdocs = checkDocStructure(sp);
+              if (sdocs.hasSpecs || sdocs.hasPlans || sdocs.hasBrainstorm) {
+                const existing = projectMap.get(sp);
+                if (existing) {
+                  existing.hasSpecs = sdocs.hasSpecs;
+                  existing.hasPlans = sdocs.hasPlans;
+                  existing.hasBrainstorm = sdocs.hasBrainstorm;
+                  existing.hasFindings = sdocs.hasFindings;
+                  existing.source = 'both';
+                } else {
+                  projectMap.set(sp, {
+                    id: sp.replace(/\//g, '-').replace(/^-/, ''),
+                    name: path.basename(sp),
+                    directory: sp,
+                    shortCode: path.basename(sp).substring(0, 2).toUpperCase(),
+                    sessionCount: 0,
+                    lastActive: null,
+                    source: 'scan',
+                    ...sdocs,
+                    exists: true,
+                  });
+                }
+              }
+            }
+          } catch {}
+        }
+      } catch {}
+    }
+
+    // Sort: projects with recent sessions first, then by name
+    const sorted = [...projectMap.values()]
+      .filter(p => p.exists !== false) // hide deleted projects
+      .sort((a, b) => {
+        // Active projects first
+        if (a.lastActive && !b.lastActive) return -1;
+        if (!a.lastActive && b.lastActive) return 1;
+        if (a.lastActive && b.lastActive) return new Date(b.lastActive) - new Date(a.lastActive);
+        return a.name.localeCompare(b.name);
+      });
+
+    return json(res, { user: user, projects: sorted });
+  }
+
   // ── Pinch REST API ──
 
   if (url.pathname === '/api/projects' && req.method === 'GET') {

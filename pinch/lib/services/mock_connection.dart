@@ -124,6 +124,23 @@ class MockConnectionService implements ConnectionService {
   }
 
   @override
+  Future<List<Project>> getMyProjects() async => [
+        const Project(
+            id: 'p1',
+            name: 'SvelteChat',
+            directory: '~/projects/sveltechat',
+            shortCode: 'SC',
+            hasSpecs: true,
+            hasPlans: true),
+        const Project(
+            id: 'p2',
+            name: 'Alpine',
+            directory: '~/projects/alpine',
+            shortCode: 'AP',
+            hasBrainstorm: true),
+      ];
+
+  @override
   Future<List<Project>> discoverProjects() async => [
         const Project(
             id: '/home/user/projects/sveltechat',
