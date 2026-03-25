@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import 'screens/docs_screen.dart';
 import 'screens/home_screen.dart';
+import 'screens/projects_screen.dart';
 import 'screens/session_screen.dart';
 import 'screens/settings_screen.dart';
 import 'widgets/app_shell.dart';
@@ -29,6 +30,13 @@ final routerProvider = Provider<GoRouter>((ref) {
               child: SessionScreen(
                 sessionId: state.pathParameters['sessionId']!,
               ),
+            ),
+          ),
+          GoRoute(
+            path: '/projects',
+            pageBuilder: (context, state) => const NoTransitionPage(
+              key: ValueKey('projects'),
+              child: ProjectsScreen(),
             ),
           ),
           GoRoute(

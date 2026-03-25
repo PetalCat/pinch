@@ -25,6 +25,10 @@ mixin _$Project {
   String get name => throw _privateConstructorUsedError;
   String get directory => throw _privateConstructorUsedError;
   String? get shortCode => throw _privateConstructorUsedError;
+  bool get hasSpecs => throw _privateConstructorUsedError;
+  bool get hasPlans => throw _privateConstructorUsedError;
+  bool get hasBrainstorm => throw _privateConstructorUsedError;
+  bool get hasFindings => throw _privateConstructorUsedError;
 
   /// Serializes this Project to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -40,7 +44,16 @@ abstract class $ProjectCopyWith<$Res> {
   factory $ProjectCopyWith(Project value, $Res Function(Project) then) =
       _$ProjectCopyWithImpl<$Res, Project>;
   @useResult
-  $Res call({String id, String name, String directory, String? shortCode});
+  $Res call({
+    String id,
+    String name,
+    String directory,
+    String? shortCode,
+    bool hasSpecs,
+    bool hasPlans,
+    bool hasBrainstorm,
+    bool hasFindings,
+  });
 }
 
 /// @nodoc
@@ -62,6 +75,10 @@ class _$ProjectCopyWithImpl<$Res, $Val extends Project>
     Object? name = null,
     Object? directory = null,
     Object? shortCode = freezed,
+    Object? hasSpecs = null,
+    Object? hasPlans = null,
+    Object? hasBrainstorm = null,
+    Object? hasFindings = null,
   }) {
     return _then(
       _value.copyWith(
@@ -81,6 +98,22 @@ class _$ProjectCopyWithImpl<$Res, $Val extends Project>
                 ? _value.shortCode
                 : shortCode // ignore: cast_nullable_to_non_nullable
                       as String?,
+            hasSpecs: null == hasSpecs
+                ? _value.hasSpecs
+                : hasSpecs // ignore: cast_nullable_to_non_nullable
+                      as bool,
+            hasPlans: null == hasPlans
+                ? _value.hasPlans
+                : hasPlans // ignore: cast_nullable_to_non_nullable
+                      as bool,
+            hasBrainstorm: null == hasBrainstorm
+                ? _value.hasBrainstorm
+                : hasBrainstorm // ignore: cast_nullable_to_non_nullable
+                      as bool,
+            hasFindings: null == hasFindings
+                ? _value.hasFindings
+                : hasFindings // ignore: cast_nullable_to_non_nullable
+                      as bool,
           )
           as $Val,
     );
@@ -95,7 +128,16 @@ abstract class _$$ProjectImplCopyWith<$Res> implements $ProjectCopyWith<$Res> {
   ) = __$$ProjectImplCopyWithImpl<$Res>;
   @override
   @useResult
-  $Res call({String id, String name, String directory, String? shortCode});
+  $Res call({
+    String id,
+    String name,
+    String directory,
+    String? shortCode,
+    bool hasSpecs,
+    bool hasPlans,
+    bool hasBrainstorm,
+    bool hasFindings,
+  });
 }
 
 /// @nodoc
@@ -116,6 +158,10 @@ class __$$ProjectImplCopyWithImpl<$Res>
     Object? name = null,
     Object? directory = null,
     Object? shortCode = freezed,
+    Object? hasSpecs = null,
+    Object? hasPlans = null,
+    Object? hasBrainstorm = null,
+    Object? hasFindings = null,
   }) {
     return _then(
       _$ProjectImpl(
@@ -135,6 +181,22 @@ class __$$ProjectImplCopyWithImpl<$Res>
             ? _value.shortCode
             : shortCode // ignore: cast_nullable_to_non_nullable
                   as String?,
+        hasSpecs: null == hasSpecs
+            ? _value.hasSpecs
+            : hasSpecs // ignore: cast_nullable_to_non_nullable
+                  as bool,
+        hasPlans: null == hasPlans
+            ? _value.hasPlans
+            : hasPlans // ignore: cast_nullable_to_non_nullable
+                  as bool,
+        hasBrainstorm: null == hasBrainstorm
+            ? _value.hasBrainstorm
+            : hasBrainstorm // ignore: cast_nullable_to_non_nullable
+                  as bool,
+        hasFindings: null == hasFindings
+            ? _value.hasFindings
+            : hasFindings // ignore: cast_nullable_to_non_nullable
+                  as bool,
       ),
     );
   }
@@ -148,6 +210,10 @@ class _$ProjectImpl implements _Project {
     required this.name,
     required this.directory,
     this.shortCode,
+    this.hasSpecs = false,
+    this.hasPlans = false,
+    this.hasBrainstorm = false,
+    this.hasFindings = false,
   });
 
   factory _$ProjectImpl.fromJson(Map<String, dynamic> json) =>
@@ -161,10 +227,22 @@ class _$ProjectImpl implements _Project {
   final String directory;
   @override
   final String? shortCode;
+  @override
+  @JsonKey()
+  final bool hasSpecs;
+  @override
+  @JsonKey()
+  final bool hasPlans;
+  @override
+  @JsonKey()
+  final bool hasBrainstorm;
+  @override
+  @JsonKey()
+  final bool hasFindings;
 
   @override
   String toString() {
-    return 'Project(id: $id, name: $name, directory: $directory, shortCode: $shortCode)';
+    return 'Project(id: $id, name: $name, directory: $directory, shortCode: $shortCode, hasSpecs: $hasSpecs, hasPlans: $hasPlans, hasBrainstorm: $hasBrainstorm, hasFindings: $hasFindings)';
   }
 
   @override
@@ -177,12 +255,30 @@ class _$ProjectImpl implements _Project {
             (identical(other.directory, directory) ||
                 other.directory == directory) &&
             (identical(other.shortCode, shortCode) ||
-                other.shortCode == shortCode));
+                other.shortCode == shortCode) &&
+            (identical(other.hasSpecs, hasSpecs) ||
+                other.hasSpecs == hasSpecs) &&
+            (identical(other.hasPlans, hasPlans) ||
+                other.hasPlans == hasPlans) &&
+            (identical(other.hasBrainstorm, hasBrainstorm) ||
+                other.hasBrainstorm == hasBrainstorm) &&
+            (identical(other.hasFindings, hasFindings) ||
+                other.hasFindings == hasFindings));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode => Object.hash(runtimeType, id, name, directory, shortCode);
+  int get hashCode => Object.hash(
+    runtimeType,
+    id,
+    name,
+    directory,
+    shortCode,
+    hasSpecs,
+    hasPlans,
+    hasBrainstorm,
+    hasFindings,
+  );
 
   /// Create a copy of Project
   /// with the given fields replaced by the non-null parameter values.
@@ -204,6 +300,10 @@ abstract class _Project implements Project {
     required final String name,
     required final String directory,
     final String? shortCode,
+    final bool hasSpecs,
+    final bool hasPlans,
+    final bool hasBrainstorm,
+    final bool hasFindings,
   }) = _$ProjectImpl;
 
   factory _Project.fromJson(Map<String, dynamic> json) = _$ProjectImpl.fromJson;
@@ -216,6 +316,14 @@ abstract class _Project implements Project {
   String get directory;
   @override
   String? get shortCode;
+  @override
+  bool get hasSpecs;
+  @override
+  bool get hasPlans;
+  @override
+  bool get hasBrainstorm;
+  @override
+  bool get hasFindings;
 
   /// Create a copy of Project
   /// with the given fields replaced by the non-null parameter values.

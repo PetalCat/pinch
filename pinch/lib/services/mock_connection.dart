@@ -122,4 +122,24 @@ class MockConnectionService implements ConnectionService {
   Future<String> createSessionWithOptions(SessionOptions options) async {
     return 'mock-${DateTime.now().millisecondsSinceEpoch}';
   }
+
+  @override
+  Future<List<Project>> discoverProjects() async => [
+        const Project(
+            id: '/home/user/projects/sveltechat',
+            name: 'SvelteChat',
+            directory: '/home/user/projects/sveltechat',
+            shortCode: 'SC',
+            hasSpecs: true,
+            hasPlans: true),
+        const Project(
+            id: '/home/user/projects/alpine',
+            name: 'Alpine',
+            directory: '/home/user/projects/alpine',
+            shortCode: 'AP',
+            hasBrainstorm: true),
+      ];
+
+  @override
+  Future<void> setActiveProject(String directory) async {}
 }

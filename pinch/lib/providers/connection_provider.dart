@@ -24,6 +24,8 @@ abstract class ConnectionService {
   Future<String> readDocument(String projectId, String docPath);
   Future<List<SessionEvent>> getSessionHistory(String sessionId);
   Future<String> createSessionWithOptions(SessionOptions options);
+  Future<List<Project>> discoverProjects();
+  Future<void> setActiveProject(String directory);
   Stream<SessionEvent> get eventStream;
 }
 

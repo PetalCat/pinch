@@ -161,6 +161,32 @@ class LocalConnection implements ConnectionService {
   }
 
   @override
+  Future<List<Project>> discoverProjects() async {
+    final resp = await _dio.get('/api/discover-projects');
+    return (resp.data as List).map((j) {
+      final m = j as Map<String, dynamic>;
+      final name = m['name'] as String;
+      return Project(
+        id: m['path'] as String,
+        name: name,
+        directory: m['path'] as String,
+        shortCode: name.length >= 2
+            ? name.substring(0, 2).toUpperCase()
+            : name.toUpperCase(),
+        hasSpecs: m['has_specs'] == true,
+        hasPlans: m['has_plans'] == true,
+        hasBrainstorm: m['has_brainstorm'] == true,
+        hasFindings: m['has_findings'] == true,
+      );
+    }).toList();
+  }
+
+  @override
+  Future<void> setActiveProject(String directory) async {
+    await _dio.post('/api/set-project', data: {'path': directory});
+  }
+
+  @override
   Future<List<SessionEvent>> getSessionHistory(String sessionId) async {
     try {
       final resp = await _dio.get('/api/sessions/$sessionId/events');

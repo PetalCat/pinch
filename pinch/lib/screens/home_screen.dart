@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../models/session.dart';
 import '../providers/connection_provider.dart';
+import '../providers/project_provider.dart';
 import '../providers/session_provider.dart';
 import '../theme/tva_colors.dart';
 import '../widgets/session_create_dialog.dart';
@@ -83,17 +84,80 @@ class HomeScreen extends ConsumerWidget {
                   ),
                 ),
 
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
 
-            // Projects
-            Text(
-              'PROJECTS',
-              style: textTheme.labelMedium,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'No projects',
-              style: _mono.copyWith(fontSize: 11, color: TvaColors.txt3),
+            // Active Project
+            Builder(builder: (context) {
+              final activeProject = ref.watch(activeProjectProvider);
+              if (activeProject == null) return const SizedBox.shrink();
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('ACTIVE PROJECT', style: textTheme.labelMedium),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                          color: TvaColors.clawd.withValues(alpha: 0.3)),
+                      color: TvaColors.bgPanel,
+                    ),
+                    child: Row(
+                      children: [
+                        Text(
+                          activeProject.shortCode ?? '',
+                          style: _mono.copyWith(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: TvaColors.txt2,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                activeProject.name,
+                                style: _mono.copyWith(
+                                    fontSize: 11, color: TvaColors.txt),
+                              ),
+                              Text(
+                                activeProject.directory,
+                                style: _mono.copyWith(
+                                    fontSize: 8, color: TvaColors.txt3),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+              );
+            }),
+
+            // Browse Projects
+            GestureDetector(
+              onTap: () => context.go('/projects'),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  border: Border.all(color: TvaColors.brd),
+                ),
+                child: Text(
+                  'BROWSE PROJECTS',
+                  style: _mono.copyWith(
+                    fontSize: 11,
+                    color: TvaColors.txt3,
+                    letterSpacing: 2,
+                  ),
+                ),
+              ),
             ),
           ],
         ),

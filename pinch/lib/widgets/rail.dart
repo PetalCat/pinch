@@ -1,29 +1,58 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../providers/project_provider.dart';
 import '../theme/tva_colors.dart';
 
-class Rail extends StatelessWidget {
+class Rail extends ConsumerWidget {
   const Rail({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final recentAsync = ref.watch(recentProjectsProvider);
+    final activeProject = ref.watch(activeProjectProvider);
+
     return Container(
       width: 56,
       color: TvaColors.bgInset,
       child: Column(
         children: [
           const SizedBox(height: 12),
-          const _RailItem(label: 'H', active: true),
+          _RailItem(
+            label: 'H',
+            active: true,
+            onTap: () => context.go('/home'),
+          ),
           const SizedBox(height: 6),
           Container(width: 20, height: 1, color: TvaColors.brd),
           const SizedBox(height: 6),
-          const _RailItem(label: 'SC', active: false),
-          const SizedBox(height: 6),
-          const _RailItem(label: 'AP', active: false, showDot: true),
-          const SizedBox(height: 6),
-          const _RailItem(label: 'ML', active: false),
+          // Show up to 4 recent projects
+          recentAsync.when(
+            data: (projects) {
+              final display = projects.take(4).toList();
+              return Column(
+                children: display.map((p) {
+                  final isActive = activeProject?.id == p.id;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: _RailItem(
+                      label: p.shortCode ?? p.name.substring(0, 2).toUpperCase(),
+                      active: isActive,
+                      showDot: isActive,
+                      onTap: () async {
+                        ref.read(activeProjectProvider.notifier).state = p;
+                      },
+                    ),
+                  );
+                }).toList(),
+              );
+            },
+            loading: () => const SizedBox.shrink(),
+            error: (_, __) => const SizedBox.shrink(),
+          ),
           const Spacer(),
-          const _AddButton(),
+          _AddButton(onTap: () => context.go('/projects')),
           const SizedBox(height: 12),
         ],
       ),
@@ -35,11 +64,13 @@ class _RailItem extends StatefulWidget {
   final String label;
   final bool active;
   final bool showDot;
+  final VoidCallback? onTap;
 
   const _RailItem({
     required this.label,
     required this.active,
     this.showDot = false,
+    this.onTap,
   });
 
   @override
@@ -100,7 +131,7 @@ class _RailItemState extends State<_RailItem> {
       onEnter: (_) => setState(() => _hovering = true),
       onExit: (_) => setState(() => _hovering = false),
       child: GestureDetector(
-        onTap: () {},
+        onTap: widget.onTap,
         child: wrapped,
       ),
     );
@@ -108,7 +139,8 @@ class _RailItemState extends State<_RailItem> {
 }
 
 class _AddButton extends StatefulWidget {
-  const _AddButton();
+  final VoidCallback? onTap;
+  const _AddButton({this.onTap});
 
   @override
   State<_AddButton> createState() => _AddButtonState();
@@ -123,7 +155,7 @@ class _AddButtonState extends State<_AddButton> {
       onEnter: (_) => setState(() => _hovering = true),
       onExit: (_) => setState(() => _hovering = false),
       child: GestureDetector(
-        onTap: () {},
+        onTap: widget.onTap,
         child: Container(
           width: 36,
           height: 36,

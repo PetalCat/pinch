@@ -10,6 +10,10 @@ class Project with _$Project {
     required String name,
     required String directory,
     String? shortCode,
+    @Default(false) bool hasSpecs,
+    @Default(false) bool hasPlans,
+    @Default(false) bool hasBrainstorm,
+    @Default(false) bool hasFindings,
   }) = _Project;
 
   factory Project.fromJson(Map<String, dynamic> json) =>
