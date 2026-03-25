@@ -382,6 +382,27 @@ class _SidebarState extends ConsumerState<Sidebar>
             ),
             const SizedBox(height: 8),
             _newSessionButton(),
+            const SizedBox(height: 6),
+            GestureDetector(
+              onTap: () => GoRouter.of(context).go('/history'),
+              child: _HoverBuilder(
+                builder: (hovering) {
+                  return Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 10),
+                    child: Text(
+                      'VIEW ALL HISTORY',
+                      style: TextStyle(
+                        color: hovering ? TvaColors.txt2 : TvaColors.txt3,
+                        fontSize: 9,
+                        fontFamily: 'monospace',
+                        letterSpacing: 1,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
             const SizedBox(height: 14),
 
             // Docs

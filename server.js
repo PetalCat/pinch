@@ -273,6 +273,137 @@ const server = http.createServer(async (req, res) => {
     if (!s) return json(res, { error: 'Not found' }, 404);
     return json(res, s.events);
   }
+  // GET /api/history — list all historical Claude sessions across all projects
+  if (url.pathname === '/api/history' && req.method === 'GET') {
+    const claudeDir = path.join(os.homedir(), '.claude', 'projects');
+    const results = [];
+
+    if (fs.existsSync(claudeDir)) {
+      for (const projectFolder of fs.readdirSync(claudeDir)) {
+        const projectPath = path.join(claudeDir, projectFolder);
+        if (!fs.statSync(projectPath).isDirectory()) continue;
+
+        // Convert folder name back to path: -Users-parker-Developer-foo → /path/to/dev/foo
+        const projectDir = '/' + projectFolder.replace(/-/g, '/');
+        const projectName = projectFolder.split('-').pop() || projectFolder;
+
+        for (const file of fs.readdirSync(projectPath)) {
+          if (!file.endsWith('.jsonl')) continue;
+          const sessionId = file.replace('.jsonl', '');
+          // Skip subagent directories and non-UUID files
+          if (!file.match(/^[0-9a-f]{8}-/)) continue;
+
+          const filePath = path.join(projectPath, file);
+          const stat = fs.statSync(filePath);
+
+          // Read first few lines to get session info
+          let firstUserMessage = null;
+          let messageCount = 0;
+          let model = null;
+          let sessionStart = null;
+
+          try {
+            const content = fs.readFileSync(filePath, 'utf8');
+            const lines = content.split('\n').filter(l => l.trim());
+            for (const line of lines.slice(0, 50)) {
+              try {
+                const obj = JSON.parse(line);
+                if (obj.type === 'user' && !firstUserMessage) {
+                  firstUserMessage = typeof obj.message?.content === 'string'
+                    ? obj.message.content.substring(0, 200)
+                    : '';
+                  sessionStart = obj.timestamp;
+                }
+                if (obj.type === 'assistant' && !model && obj.message?.model) {
+                  model = obj.message.model;
+                }
+                if (obj.type === 'user' || obj.type === 'assistant') messageCount++;
+              } catch {}
+            }
+          } catch {}
+
+          results.push({
+            id: sessionId,
+            projectDir,
+            projectName,
+            firstMessage: firstUserMessage || '(no message)',
+            model: model || 'unknown',
+            startedAt: sessionStart || stat.mtime.toISOString(),
+            lastModified: stat.mtime.toISOString(),
+            sizeBytes: stat.size,
+            messageCount,
+          });
+        }
+      }
+    }
+
+    // Sort by lastModified, newest first
+    results.sort((a, b) => new Date(b.lastModified) - new Date(a.lastModified));
+    return json(res, results);
+  }
+
+  // GET /api/history/:sessionId — read full session JSONL as parsed events
+  if (url.pathname.match(/^\/api\/history\/[0-9a-f-]+$/) && req.method === 'GET') {
+    const sessionId = url.pathname.split('/').pop();
+    const claudeDir = path.join(os.homedir(), '.claude', 'projects');
+
+    // Search all project folders for this session
+    let filePath = null;
+    if (fs.existsSync(claudeDir)) {
+      for (const projectFolder of fs.readdirSync(claudeDir)) {
+        const candidate = path.join(claudeDir, projectFolder, sessionId + '.jsonl');
+        if (fs.existsSync(candidate)) {
+          filePath = candidate;
+          break;
+        }
+      }
+    }
+
+    if (!filePath) return json(res, { error: 'Session not found' }, 404);
+
+    const fileContent = fs.readFileSync(filePath, 'utf8');
+    const events = [];
+    for (const line of fileContent.split('\n')) {
+      if (!line.trim()) continue;
+      try {
+        const obj = JSON.parse(line);
+        if (obj.type === 'user') {
+          events.push({
+            id: obj.uuid || uuidv4(),
+            sessionId: obj.sessionId || sessionId,
+            timestamp: obj.timestamp,
+            type: 'userMessage',
+            data: { text: typeof obj.message?.content === 'string' ? obj.message.content : '' },
+          });
+        } else if (obj.type === 'assistant' && obj.message?.content) {
+          const blocks = obj.message.content;
+          if (Array.isArray(blocks)) {
+            for (const block of blocks) {
+              if (block.type === 'text') {
+                events.push({
+                  id: (obj.uuid || uuidv4()) + '-text',
+                  sessionId: obj.sessionId || sessionId,
+                  timestamp: obj.timestamp,
+                  type: 'assistantText',
+                  data: { text: block.text, done: true },
+                });
+              } else if (block.type === 'tool_use') {
+                events.push({
+                  id: (obj.uuid || uuidv4()) + '-tool-' + block.id,
+                  sessionId: obj.sessionId || sessionId,
+                  timestamp: obj.timestamp,
+                  type: 'toolUse',
+                  data: { toolName: block.name, input: block.input || {}, toolUseId: block.id },
+                });
+              }
+            }
+          }
+        }
+      } catch {}
+    }
+    return json(res, events);
+  }
+
   if (url.pathname === '/api/health' && req.method === 'GET') {
     return json(res, { status: 'ok', uptime: process.uptime(), activeSessions: [...sessions.values()].filter(s => s.status === 'active').length, totalSessions: sessions.size });
   }
