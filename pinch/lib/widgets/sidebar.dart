@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../models/session.dart';
 import '../providers/active_session_provider.dart';
 import '../providers/clawd_state_provider.dart';
+import '../providers/history_provider.dart';
 import '../providers/session_provider.dart';
 import '../theme/tva_colors.dart';
 
@@ -208,6 +209,77 @@ class _SidebarState extends ConsumerState<Sidebar>
     );
   }
 
+  // ---- historical session item ----
+
+  Widget _historicalSessionItem(Map<String, dynamic> session) {
+    final firstMsg = (session['firstMessage'] as String? ?? '').trim();
+    final displayName = firstMsg.length > 40
+        ? '${firstMsg.substring(0, 40)}...'
+        : firstMsg;
+    final model = session['model'] as String? ?? '';
+    final lastMod = DateTime.tryParse(session['lastModified'] as String? ?? '');
+    final timeAgo = lastMod != null ? _formatTimeAgo(lastMod) : '';
+    final sessionId = session['id'] as String? ?? '';
+
+    return GestureDetector(
+      onTap: () => GoRouter.of(context).go('/history/$sessionId'),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        margin: const EdgeInsets.only(bottom: 3),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 5,
+                  height: 5,
+                  decoration: const BoxDecoration(
+                    color: TvaColors.brd,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    displayName,
+                    style: const TextStyle(
+                      fontFamily: 'IBMPlexMono',
+                      fontSize: 11,
+                      color: TvaColors.txt2,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            Padding(
+              padding: const EdgeInsets.only(left: 11, top: 2),
+              child: Text(
+                '$model · $timeAgo',
+                style: const TextStyle(
+                  fontFamily: 'IBMPlexMono',
+                  fontSize: 8,
+                  color: TvaColors.txt3,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatTimeAgo(DateTime dt) {
+    final diff = DateTime.now().difference(dt);
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    if (diff.inDays < 30) return '${(diff.inDays / 7).floor()}w ago';
+    return '${(diff.inDays / 30).floor()}mo ago';
+  }
+
   // ---- new session button ----
 
   Widget _newSessionButton() {
@@ -338,6 +410,7 @@ class _SidebarState extends ConsumerState<Sidebar>
   @override
   Widget build(BuildContext context) {
     final sessionsAsync = ref.watch(sessionsProvider);
+    final historicalAsync = ref.watch(projectSessionsProvider);
 
     return Container(
       width: 200,
@@ -350,6 +423,7 @@ class _SidebarState extends ConsumerState<Sidebar>
             // Sessions
             _sectionHeader('SESSIONS'),
             const SizedBox(height: 8),
+            // Active sessions (from server)
             sessionsAsync.when(
               loading: () => const Padding(
                 padding: EdgeInsets.symmetric(vertical: 8),
@@ -377,6 +451,28 @@ class _SidebarState extends ConsumerState<Sidebar>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   for (final s in sessions) _sessionItem(s),
+                ],
+              ),
+            ),
+            // Historical sessions (from JSONL history)
+            historicalAsync.when(
+              loading: () => const Padding(
+                padding: EdgeInsets.symmetric(vertical: 4),
+                child: Text(
+                  'Loading history...',
+                  style: TextStyle(
+                    color: TvaColors.txt3,
+                    fontSize: 10,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ),
+              error: (_, __) => const SizedBox.shrink(),
+              data: (sessions) => Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final s in sessions.take(10))
+                    _historicalSessionItem(s),
                 ],
               ),
             ),
