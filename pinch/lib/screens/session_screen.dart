@@ -1,163 +1,88 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../models/session_event.dart';
+import '../providers/active_session_provider.dart';
+import '../providers/connection_provider.dart';
+import '../providers/session_provider.dart';
 import '../theme/tva_colors.dart';
+import '../widgets/input_bar.dart';
+import '../widgets/terminal/terminal_view.dart';
 import '../widgets/timeline/timeline_view.dart';
 
-class SessionScreen extends StatefulWidget {
+enum _ViewMode { timeline, terminal }
+
+class SessionScreen extends ConsumerStatefulWidget {
   final String sessionId;
   const SessionScreen({super.key, required this.sessionId});
 
   @override
-  State<SessionScreen> createState() => _SessionScreenState();
+  ConsumerState<SessionScreen> createState() => _SessionScreenState();
 }
 
-class _SessionScreenState extends State<SessionScreen> {
-  bool _isTimeline = true;
+class _SessionScreenState extends ConsumerState<SessionScreen> {
+  _ViewMode _viewMode = _ViewMode.timeline;
 
-  static final _demoEvents = [
-    SessionEvent(
-      id: '1',
-      sessionId: 'demo',
-      timestamp: DateTime.now(),
-      type: EventType.userMessage,
-      data: const {
-        'text':
-            'Fix the authentication middleware — tokens expire silently and users with expired tokens can still access protected routes.',
-      },
-    ),
-    SessionEvent(
-      id: '2',
-      sessionId: 'demo',
-      timestamp: DateTime.now(),
-      type: EventType.assistantText,
-      data: const {
-        'text':
-            "I'll fix the auth middleware. Let me examine the current implementation.",
-        'done': true,
-      },
-    ),
-    SessionEvent(
-      id: '3',
-      sessionId: 'demo',
-      timestamp: DateTime.now(),
-      type: EventType.toolUse,
-      data: const {
-        'toolName': 'Read',
-        'input': {'path': 'src/auth/middleware.ts'},
-        'toolUseId': 't1',
-      },
-    ),
-    SessionEvent(
-      id: '4',
-      sessionId: 'demo',
-      timestamp: DateTime.now(),
-      type: EventType.toolResult,
-      data: const {
-        'toolUseId': 't1',
-        'success': true,
-        'output': '',
-        'duration': 0.3,
-      },
-    ),
-    SessionEvent(
-      id: '5',
-      sessionId: 'demo',
-      timestamp: DateTime.now(),
-      type: EventType.toolUse,
-      data: const {
-        'toolName': 'Edit',
-        'input': {'path': 'src/auth/middleware.ts'},
-        'toolUseId': 't2',
-      },
-    ),
-    SessionEvent(
-      id: '6',
-      sessionId: 'demo',
-      timestamp: DateTime.now(),
-      type: EventType.toolResult,
-      data: const {
-        'toolUseId': 't2',
-        'success': true,
-        'duration': 1.2,
-        'diff': {
-          'file': 'src/auth/middleware.ts',
-          'added': 8,
-          'removed': 2,
-          'lines': [
-            '  const token = req.headers.authorization;',
-            '- if (!token) return res.status(401).send();',
-            '+ if (!token) return res.status(401).json({ error: "No token" });',
-            '+ const decoded = verifyToken(token);',
-            '+ if (decoded.exp < Date.now() / 1000) {',
-            '+   return res.status(401).json({ error: "Expired" });',
-            '+ }',
-          ],
-        },
-      },
-    ),
-    SessionEvent(
-      id: '7',
-      sessionId: 'demo',
-      timestamp: DateTime.now(),
-      type: EventType.permissionRequest,
-      data: const {
-        'toolName': 'Bash',
-        'command': 'npm test --filter auth',
-        'workDir': '~/projects/sveltechat',
-        'toolUseId': 't3',
-      },
-    ),
-    SessionEvent(
-      id: '8',
-      sessionId: 'demo',
-      timestamp: DateTime.now(),
-      type: EventType.toolUse,
-      data: const {
-        'toolName': 'Bash',
-        'input': {'command': 'npm test --filter auth'},
-        'toolUseId': 't3',
-      },
-    ),
-    SessionEvent(
-      id: '9',
-      sessionId: 'demo',
-      timestamp: DateTime.now(),
-      type: EventType.toolResult,
-      data: const {
-        'toolUseId': 't3',
-        'success': false,
-        'duration': 2.1,
-        'output':
-            'FAIL  2 of 12 tests failed\n  x middleware rejects missing token\n  x middleware rejects expired token',
-      },
-    ),
-    SessionEvent(
-      id: '10',
-      sessionId: 'demo',
-      timestamp: DateTime.now(),
-      type: EventType.assistantText,
-      data: const {
-        'text':
-            'Fixed. The issue was in two places — the middleware was not checking token.exp against the current timestamp, and the error response shape did not match what the test suite expected. All 12 auth tests now pass.',
-        'done': true,
-      },
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    // Set active session on init
+    Future.microtask(() {
+      ref.read(activeSessionIdProvider.notifier).state = widget.sessionId;
+      ref.read(activeSessionEventsProvider.notifier).clearAndListenTo(widget.sessionId);
+    });
+  }
+
+  @override
+  void didUpdateWidget(SessionScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.sessionId != widget.sessionId) {
+      ref.read(activeSessionIdProvider.notifier).state = widget.sessionId;
+      ref.read(activeSessionEventsProvider.notifier).clearAndListenTo(widget.sessionId);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final events = ref.watch(activeSessionEventsProvider);
+    final meta = ref.watch(sessionMetaProvider);
+
     return Column(
       children: [
-        _buildSessionBar(),
+        _buildSessionBar(meta),
         Expanded(
-          child: TimelineView(events: _demoEvents),
+          child: _viewMode == _ViewMode.timeline
+              ? TimelineView(events: events)
+              : TerminalView(events: events),
+        ),
+        InputBar(
+          enabled: !meta.isResponding,
+          onSubmit: (text) {
+            final conn = ref.read(connectionServiceProvider);
+            conn.sendPrompt(widget.sessionId, text);
+          },
         ),
       ],
     );
   }
 
-  Widget _buildSessionBar() {
+  Widget _buildSessionBar(SessionMeta meta) {
+    // Try to get session name from sessions provider
+    final sessionsAsync = ref.watch(sessionsProvider);
+    final sessionName = sessionsAsync.whenOrNull(
+      data: (sessions) {
+        try {
+          return sessions
+              .firstWhere((s) => s.id == widget.sessionId)
+              .name;
+        } catch (_) {
+          return null;
+        }
+      },
+    ) ?? widget.sessionId;
+
+    final elapsed = '${meta.elapsed.inMinutes}m';
+    final model = meta.model ?? 'opus 4.6';
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       decoration: const BoxDecoration(
@@ -176,9 +101,9 @@ class _SessionScreenState extends State<SessionScreen> {
             ),
           ),
           const SizedBox(width: 8),
-          const Text(
-            'Fix auth middleware',
-            style: TextStyle(
+          Text(
+            sessionName,
+            style: const TextStyle(
               fontFamily: 'monospace',
               fontSize: 12,
               fontWeight: FontWeight.w600,
@@ -186,9 +111,9 @@ class _SessionScreenState extends State<SessionScreen> {
             ),
           ),
           const SizedBox(width: 8),
-          const Text(
-            '2m — opus 4.6',
-            style: TextStyle(
+          Text(
+            '$elapsed — $model',
+            style: const TextStyle(
               fontFamily: 'monospace',
               fontSize: 9,
               color: TvaColors.txt3,
@@ -198,23 +123,29 @@ class _SessionScreenState extends State<SessionScreen> {
           // Toggle group
           Row(
             children: [
-              _buildToggleBtn('TIMELINE', isActive: _isTimeline),
-              _buildToggleBtn('TERMINAL', isActive: !_isTimeline),
+              _buildToggleBtn('TIMELINE',
+                  isActive: _viewMode == _ViewMode.timeline),
+              _buildToggleBtn('TERMINAL',
+                  isActive: _viewMode == _ViewMode.terminal),
             ],
           ),
           const SizedBox(width: 8),
           // Stop button
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            decoration: BoxDecoration(
-              border: Border.all(color: TvaColors.rust),
-            ),
-            child: const Text(
-              'STOP',
-              style: TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 9,
-                color: TvaColors.rust,
+          GestureDetector(
+            onTap: () =>
+                ref.read(connectionServiceProvider).stopSession(widget.sessionId),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                border: Border.all(color: TvaColors.rust),
+              ),
+              child: const Text(
+                'STOP',
+                style: TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 9,
+                  color: TvaColors.rust,
+                ),
               ),
             ),
           ),
@@ -227,7 +158,8 @@ class _SessionScreenState extends State<SessionScreen> {
     return GestureDetector(
       onTap: () {
         setState(() {
-          _isTimeline = label == 'TIMELINE';
+          _viewMode =
+              label == 'TIMELINE' ? _ViewMode.timeline : _ViewMode.terminal;
         });
       },
       child: Container(

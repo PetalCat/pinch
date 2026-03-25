@@ -1,19 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../models/session.dart';
+import '../providers/active_session_provider.dart';
+import '../providers/clawd_state_provider.dart';
+import '../providers/session_provider.dart';
 import '../theme/tva_colors.dart';
 
 // ---------------------------------------------------------------------------
-// Data models
+// Data models (for file tree — still hardcoded)
 // ---------------------------------------------------------------------------
-
-enum SessionStatus { live, run, end }
-
-class _Session {
-  final String name;
-  final SessionStatus status;
-  final String meta;
-  const _Session(this.name, this.status, this.meta);
-}
 
 class _FileNode {
   final String label;
@@ -36,23 +33,18 @@ class _FileNode {
 // Sidebar
 // ---------------------------------------------------------------------------
 
-class Sidebar extends StatefulWidget {
+class Sidebar extends ConsumerStatefulWidget {
   const Sidebar({super.key});
 
   @override
-  State<Sidebar> createState() => _SidebarState();
+  ConsumerState<Sidebar> createState() => _SidebarState();
 }
 
-class _SidebarState extends State<Sidebar> with SingleTickerProviderStateMixin {
+class _SidebarState extends ConsumerState<Sidebar>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _pulse;
 
-  // ---- demo data ----
-
-  static const _sessions = [
-    _Session('Fix auth middleware', SessionStatus.live, '2m — reading files'),
-    _Session('Add dark mode', SessionStatus.run, '14m — writing code'),
-    _Session('Refactor DB layer', SessionStatus.end, 'ended — 34m ago'),
-  ];
+  // ---- hardcoded data (docs & files stay) ----
 
   static const _docs = ['Auth design spec', 'Migration plan', 'API endpoints'];
 
@@ -100,131 +92,153 @@ class _SidebarState extends State<Sidebar> with SingleTickerProviderStateMixin {
 
   // ---- session item ----
 
-  Widget _sessionItem(_Session s) {
-    final isActive = s.status == SessionStatus.live;
+  Widget _sessionItem(Session session) {
+    final activeId = ref.watch(activeSessionIdProvider);
+    final isActive = session.id == activeId;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      margin: const EdgeInsets.only(bottom: 3),
-      decoration: BoxDecoration(
-        color: isActive ? const Color(0x0Ac08818) : Colors.transparent,
-        border: Border(
-          left: BorderSide(
-            color: isActive ? TvaColors.amber : Colors.transparent,
-            width: 2,
-          ),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              _statusDot(s.status),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  s.name,
-                  style: TextStyle(
-                    color: isActive ? TvaColors.txt : TvaColors.txt2,
-                    fontSize: 11,
-                    fontFamily: 'monospace',
-                  ),
-                ),
-              ),
-            ],
-          ),
-          Padding(
-            padding: const EdgeInsets.only(left: 11, top: 2),
-            child: Text(
-              s.meta,
-              style: const TextStyle(
-                color: TvaColors.txt3,
-                fontSize: 8,
-                fontFamily: 'monospace',
-              ),
+    // Map session status to dot color
+    Color dotColor;
+    bool pulsing = false;
+    switch (session.status) {
+      case SessionStatus.active:
+        dotColor = TvaColors.orange;
+        pulsing = true;
+      case SessionStatus.idle:
+        dotColor = TvaColors.amber;
+      case SessionStatus.ended:
+        dotColor = TvaColors.brd;
+    }
+
+    // Build meta text
+    String meta;
+    if (isActive) {
+      final sessionMeta = ref.watch(sessionMetaProvider);
+      final elapsed = sessionMeta.elapsed.inMinutes;
+      final clawdState = ref.watch(clawdStateProvider);
+      meta = '${elapsed}m — ${clawdState.name}';
+    } else {
+      meta = session.status.name;
+    }
+
+    return GestureDetector(
+      onTap: () => GoRouter.of(context).go('/session/${session.id}'),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        margin: const EdgeInsets.only(bottom: 3),
+        decoration: BoxDecoration(
+          color: isActive ? const Color(0x0Ac08818) : Colors.transparent,
+          border: Border(
+            left: BorderSide(
+              color: isActive ? TvaColors.amber : Colors.transparent,
+              width: 2,
             ),
           ),
-        ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                _statusDot(dotColor, pulsing: pulsing),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    session.name,
+                    style: TextStyle(
+                      color: isActive ? TvaColors.txt : TvaColors.txt2,
+                      fontSize: 11,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            Padding(
+              padding: const EdgeInsets.only(left: 11, top: 2),
+              child: Text(
+                meta,
+                style: const TextStyle(
+                  color: TvaColors.txt3,
+                  fontSize: 8,
+                  fontFamily: 'monospace',
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   // ---- status dot ----
 
-  Widget _statusDot(SessionStatus status) {
-    switch (status) {
-      case SessionStatus.live:
-        return AnimatedBuilder(
-          animation: _pulse,
-          builder: (context, child) {
-            final opacity = 1.0 - (_pulse.value * 0.5); // 1.0 → 0.5
-            return Opacity(
-              opacity: opacity,
-              child: Container(
-                width: 5,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: TvaColors.orange,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: TvaColors.orange.withValues(alpha: 0.6),
-                      blurRadius: 4,
-                    ),
-                  ],
-                ),
+  Widget _statusDot(Color color, {bool pulsing = false}) {
+    if (pulsing) {
+      return AnimatedBuilder(
+        animation: _pulse,
+        builder: (context, child) {
+          final opacity = 1.0 - (_pulse.value * 0.5); // 1.0 -> 0.5
+          return Opacity(
+            opacity: opacity,
+            child: Container(
+              width: 5,
+              height: 5,
+              decoration: BoxDecoration(
+                color: color,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.6),
+                    blurRadius: 4,
+                  ),
+                ],
               ),
-            );
-          },
-        );
-      case SessionStatus.run:
-        return Container(
-          width: 5,
-          height: 5,
-          decoration: const BoxDecoration(
-            color: TvaColors.amber,
-            shape: BoxShape.circle,
-          ),
-        );
-      case SessionStatus.end:
-        return Container(
-          width: 5,
-          height: 5,
-          decoration: const BoxDecoration(
-            color: TvaColors.brd,
-            shape: BoxShape.circle,
-          ),
-        );
+            ),
+          );
+        },
+      );
     }
+    return Container(
+      width: 5,
+      height: 5,
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+      ),
+    );
   }
 
   // ---- new session button ----
 
   Widget _newSessionButton() {
-    return _HoverBuilder(
-      builder: (hovering) {
-        return Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: hovering ? TvaColors.brd2 : TvaColors.brd,
-              style: BorderStyle.solid, // Flutter doesn't support dashed natively
-            ),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            '+ NEW SESSION',
-            style: TextStyle(
-              color: hovering ? TvaColors.txt2 : TvaColors.txt3,
-              fontSize: 10,
-              fontFamily: 'monospace',
-              letterSpacing: 1,
-            ),
-          ),
-        );
+    return GestureDetector(
+      onTap: () {
+        debugPrint('New session tapped — dialog not yet wired');
       },
+      child: _HoverBuilder(
+        builder: (hovering) {
+          return Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: hovering ? TvaColors.brd2 : TvaColors.brd,
+                style: BorderStyle.solid,
+              ),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              '+ NEW SESSION',
+              style: TextStyle(
+                color: hovering ? TvaColors.txt2 : TvaColors.txt3,
+                fontSize: 10,
+                fontFamily: 'monospace',
+                letterSpacing: 1,
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -323,6 +337,8 @@ class _SidebarState extends State<Sidebar> with SingleTickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
+    final sessionsAsync = ref.watch(sessionsProvider);
+
     return Container(
       width: 200,
       color: TvaColors.bg2,
@@ -334,7 +350,36 @@ class _SidebarState extends State<Sidebar> with SingleTickerProviderStateMixin {
             // Sessions
             _sectionHeader('SESSIONS'),
             const SizedBox(height: 8),
-            for (final s in _sessions) _sessionItem(s),
+            sessionsAsync.when(
+              loading: () => const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                  'Loading...',
+                  style: TextStyle(
+                    color: TvaColors.txt3,
+                    fontSize: 10,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ),
+              error: (_, __) => const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                  'Offline',
+                  style: TextStyle(
+                    color: TvaColors.rust,
+                    fontSize: 10,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ),
+              data: (sessions) => Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final s in sessions) _sessionItem(s),
+                ],
+              ),
+            ),
             const SizedBox(height: 8),
             _newSessionButton(),
             const SizedBox(height: 14),

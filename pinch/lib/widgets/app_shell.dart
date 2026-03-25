@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../providers/active_session_provider.dart';
+import '../providers/clawd_state_provider.dart';
 import '../theme/tva_colors.dart';
 import 'masthead.dart';
 import 'rail.dart';
 import 'sidebar.dart';
+import 'ticker.dart';
 
-class AppShell extends StatelessWidget {
+class AppShell extends ConsumerWidget {
   final Widget child;
   const AppShell({super.key, required this.child});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isDesktop = MediaQuery.of(context).size.width > 900;
 
     return Scaffold(
@@ -19,22 +23,16 @@ class AppShell extends StatelessWidget {
         children: [
           const Masthead(),
           Container(height: 1, color: TvaColors.brd),
-          // Ticker placeholder
-          Container(
-            height: 24,
-            color: TvaColors.bgInset,
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            alignment: Alignment.centerLeft,
-            child: const Text(
-              'SYS — SESSION ACTIVE',
-              style: TextStyle(
-                color: TvaColors.txt3,
-                fontSize: 9,
-                fontFamily: 'monospace',
-                letterSpacing: 1,
-              ),
-            ),
-          ),
+          // Ticker
+          Consumer(builder: (context, ref, _) {
+            final meta = ref.watch(sessionMetaProvider);
+            final clawdState = ref.watch(clawdStateProvider);
+            final stateText = clawdState.name.toUpperCase();
+            return Ticker(
+              text:
+                  'SESSION ACTIVE — MODEL: ${meta.model ?? "OPUS 4.6"} — STATUS: $stateText — PERMISSION MODE: DEFAULT',
+            );
+          }),
           Container(height: 1, color: TvaColors.brd),
           // Main body
           Expanded(
