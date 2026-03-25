@@ -10,7 +10,7 @@ class Rail extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final recentAsync = ref.watch(recentProjectsProvider);
+    final projectsAsync = ref.watch(allProjectsProvider);
     final activeProject = ref.watch(activeProjectProvider);
 
     return Container(
@@ -27,12 +27,12 @@ class Rail extends ConsumerWidget {
           const SizedBox(height: 6),
           Container(width: 20, height: 1, color: TvaColors.brd),
           const SizedBox(height: 6),
-          // Show up to 4 recent projects
-          recentAsync.when(
-            data: (projects) {
-              final display = projects.take(4).toList();
-              return Column(
-                children: display.map((p) {
+          // Scrollable project list
+          Expanded(
+            child: projectsAsync.when(
+              data: (projects) => ListView(
+                padding: EdgeInsets.zero,
+                children: projects.map((p) {
                   final isActive = activeProject?.id == p.id;
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 6),
@@ -40,18 +40,17 @@ class Rail extends ConsumerWidget {
                       label: p.shortCode ?? p.name.substring(0, 2).toUpperCase(),
                       active: isActive,
                       showDot: isActive,
-                      onTap: () async {
+                      onTap: () {
                         ref.read(activeProjectProvider.notifier).state = p;
                       },
                     ),
                   );
                 }).toList(),
-              );
-            },
-            loading: () => const SizedBox.shrink(),
-            error: (_, __) => const SizedBox.shrink(),
+              ),
+              loading: () => const SizedBox.shrink(),
+              error: (_, __) => const SizedBox.shrink(),
+            ),
           ),
-          const Spacer(),
           _AddButton(onTap: () => context.go('/projects')),
           const SizedBox(height: 12),
         ],

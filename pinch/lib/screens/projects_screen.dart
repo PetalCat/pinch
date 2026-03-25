@@ -15,8 +15,6 @@ class ProjectsScreen extends ConsumerStatefulWidget {
 }
 
 class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
-  bool _isScanning = false;
-
   static const _mono = TextStyle(fontFamily: 'IBMPlexMono');
 
   Widget _tag(String label, Color color) {
@@ -39,7 +37,7 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
     );
   }
 
-  Widget _projectCard(Project project) {
+  Widget _projectCard(Project project, {int? sessionCount}) {
     return GestureDetector(
       onTap: () async {
         final conn = ref.read(connectionServiceProvider);
@@ -99,6 +97,8 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
                   Row(
                     spacing: 6,
                     children: [
+                      if (sessionCount != null && sessionCount > 0)
+                        _tag('$sessionCount SESSIONS', TvaColors.txt2),
                       if (project.hasSpecs) _tag('SPECS', TvaColors.tealBr),
                       if (project.hasPlans) _tag('PLANS', TvaColors.greenBr),
                       if (project.hasBrainstorm)
@@ -122,8 +122,7 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final recentAsync = ref.watch(recentProjectsProvider);
-    final discoveredAsync = ref.watch(discoveredProjectsProvider(_isScanning));
+    final allAsync = ref.watch(allProjectsProvider);
 
     return SingleChildScrollView(
       child: Padding(
@@ -138,19 +137,20 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
                 style: textTheme.bodySmall),
             const SizedBox(height: 32),
 
-            // Recent Projects
-            Text('RECENT', style: textTheme.labelMedium),
+            // All Projects
+            Text('ALL PROJECTS', style: textTheme.labelMedium),
             const SizedBox(height: 12),
-            recentAsync.when(
+            allAsync.when(
               data: (projects) => projects.isEmpty
                   ? Text(
-                      'No recent projects',
+                      'No projects found',
                       style:
                           _mono.copyWith(fontSize: 11, color: TvaColors.txt3),
                     )
                   : Column(
-                      children:
-                          projects.map((p) => _projectCard(p)).toList(),
+                      children: projects
+                          .map((p) => _projectCard(p))
+                          .toList(),
                     ),
               loading: () => Text(
                 'Loading...',
@@ -164,18 +164,14 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
 
             const SizedBox(height: 24),
 
-            // Scan button
+            // Scan / refresh button
             GestureDetector(
-              onTap: () => setState(() => _isScanning = true),
+              onTap: () => ref.invalidate(allProjectsProvider),
               child: Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
-                  border: Border.all(
-                    color: TvaColors.amber,
-                    // Note: Flutter doesn't have dashed border natively,
-                    // using solid amber border instead
-                  ),
+                  border: Border.all(color: TvaColors.amber),
                 ),
                 child: Row(
                   children: [
@@ -188,55 +184,17 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
                       ),
                     ),
                     const Spacer(),
-                    if (_isScanning && discoveredAsync.isLoading)
-                      const SizedBox(
-                        width: 12,
-                        height: 12,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 1,
-                          color: TvaColors.amber,
-                        ),
-                      )
-                    else
-                      Text(
-                        '*',
-                        style: _mono.copyWith(
-                          fontSize: 14,
-                          color: TvaColors.amber,
-                        ),
+                    Text(
+                      '*',
+                      style: _mono.copyWith(
+                        fontSize: 14,
+                        color: TvaColors.amber,
                       ),
+                    ),
                   ],
                 ),
               ),
             ),
-
-            const SizedBox(height: 24),
-
-            // Discovered Projects
-            if (_isScanning) ...[
-              Text('DISCOVERED', style: textTheme.labelMedium),
-              const SizedBox(height: 12),
-              discoveredAsync.when(
-                data: (projects) => projects.isEmpty
-                    ? Text(
-                        'No projects found',
-                        style: _mono.copyWith(
-                            fontSize: 11, color: TvaColors.txt3),
-                      )
-                    : Column(
-                        children:
-                            projects.map((p) => _projectCard(p)).toList(),
-                      ),
-                loading: () => Text(
-                  'Scanning...',
-                  style: _mono.copyWith(fontSize: 11, color: TvaColors.txt3),
-                ),
-                error: (e, _) => Text(
-                  'Scan failed',
-                  style: _mono.copyWith(fontSize: 11, color: TvaColors.txt3),
-                ),
-              ),
-            ],
           ],
         ),
       ),
