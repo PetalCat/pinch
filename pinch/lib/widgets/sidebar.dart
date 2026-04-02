@@ -5,9 +5,11 @@ import 'package:go_router/go_router.dart';
 import '../models/session.dart';
 import '../providers/active_session_provider.dart';
 import '../providers/clawd_state_provider.dart';
+import '../providers/connection_provider.dart';
 import '../providers/history_provider.dart';
 import '../providers/session_provider.dart';
 import '../theme/tva_colors.dart';
+import 'session_create_dialog.dart';
 
 // ---------------------------------------------------------------------------
 // Data models (for file tree — still hardcoded)
@@ -284,8 +286,14 @@ class _SidebarState extends ConsumerState<Sidebar>
 
   Widget _newSessionButton() {
     return GestureDetector(
-      onTap: () {
-        debugPrint('New session tapped — dialog not yet wired');
+      onTap: () async {
+        final options = await showSessionCreateDialog(context);
+        if (options != null && mounted) {
+          final conn = ref.read(connectionServiceProvider);
+          final sessionId = await conn.createSessionWithOptions(options);
+          ref.read(activeSessionIdProvider.notifier).state = sessionId;
+          if (mounted) context.go('/session/$sessionId');
+        }
       },
       child: _HoverBuilder(
         builder: (hovering) {
@@ -511,6 +519,35 @@ class _SidebarState extends ConsumerState<Sidebar>
             _sectionHeader('FILES'),
             const SizedBox(height: 8),
             for (final f in _files) _fileItem(f),
+            const SizedBox(height: 14),
+
+            // Settings
+            GestureDetector(
+              onTap: () => GoRouter.of(context).go('/settings'),
+              child: _HoverBuilder(
+                builder: (hovering) {
+                  return Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: hovering ? TvaColors.brd2 : TvaColors.brd,
+                      ),
+                    ),
+                    child: Text(
+                      'SETTINGS',
+                      style: TextStyle(
+                        color: hovering ? TvaColors.txt2 : TvaColors.txt3,
+                        fontSize: 9,
+                        fontFamily: 'IBMPlexMono',
+                        letterSpacing: 2,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  );
+                },
+              ),
+            ),
           ],
         ),
       ),

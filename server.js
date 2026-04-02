@@ -741,17 +741,23 @@ const sessions = new Map();
 
 function createClaudeSession(ws, options) {
   const sessionId = uuidv4();
-  const args = ['--print', '--output-format', 'stream-json', '--input-format', 'stream-json'];
+  const claudePath = process.env.CLAUDE_PATH || '/Users/dev/.local/bin/claude';
+  let cwd = options.projectDir || process.cwd();
+  if (cwd.startsWith('~')) cwd = cwd.replace('~', require('os').homedir());
+  const fs = require('fs');
+  if (!fs.existsSync(cwd)) { fs.mkdirSync(cwd, { recursive: true }); console.log(`Created directory: ${cwd}`); }
 
-  if (options.model) args.push('--model', options.model);
-  if (options.permissionMode) args.push('--permission-mode', options.permissionMode);
+  // Print mode with stream-json for structured events + multi-turn via input-format
+  const args = ['--print', '--output-format', 'stream-json', '--verbose', '--input-format', 'stream-json'];
+  if (options.model && options.model !== 'auto') args.push('--model', options.model);
+  if (options.permissionMode && options.permissionMode !== 'default') args.push('--permission-mode', options.permissionMode);
   if (options.dangerouslySkipPermissions) args.push('--dangerously-skip-permissions');
   if (options.allowDangerouslySkipPermissions) args.push('--allow-dangerously-skip-permissions');
   if (options.allowedTools && options.allowedTools.length) args.push('--allowed-tools', ...options.allowedTools);
   if (options.disallowedTools && options.disallowedTools.length) args.push('--disallowed-tools', ...options.disallowedTools);
   if (options.systemPrompt) args.push('--system-prompt', options.systemPrompt);
   if (options.appendSystemPrompt) args.push('--append-system-prompt', options.appendSystemPrompt);
-  if (options.effort) args.push('--effort', options.effort);
+  if (options.effort && options.effort !== 'high') args.push('--effort', options.effort);
   if (options.maxBudget) args.push('--max-budget-usd', String(options.maxBudget));
   if (options.addDirs && options.addDirs.length) {
     for (const dir of options.addDirs) args.push('--add-dir', dir);
@@ -761,46 +767,115 @@ function createClaudeSession(ws, options) {
   if (options.sessionName) args.push('--name', options.sessionName);
   if (options.resumeSessionId) args.push('--resume', options.resumeSessionId);
 
+  console.log(`Spawning: ${claudePath} ${args.join(' ')}`);
+  console.log(`CWD: ${cwd}`);
+
   const { spawn } = require('child_process');
-  const proc = spawn('claude', args, {
-    cwd: options.projectDir || process.cwd(),
-    env: { ...process.env },
+
+  const proc = spawn(claudePath, args, {
+    cwd,
+    stdio: ['pipe', 'pipe', 'pipe'],
+    env: { ...process.env, PATH: process.env.PATH + ':/Users/dev/.local/bin' },
   });
 
-  const session = { id: sessionId, proc, options, events: [], status: 'active', startedAt: Date.now(), ws };
+  const session = { id: sessionId, proc, options, events: [], status: 'active', startedAt: Date.now(), ws, initialized: false };
   sessions.set(sessionId, session);
 
-  // Send session start
-  const startEvent = {
-    id: uuidv4(), sessionId, timestamp: new Date().toISOString(),
-    type: 'sessionStart',
-    data: { model: options.model || 'default', projectDir: options.projectDir, sessionName: options.sessionName || 'New Session' },
-  };
-  session.events.push(startEvent);
-  sendToClient(ws, startEvent);
+  proc.on('error', (err) => {
+    console.error(`Spawn error for session ${sessionId}: ${err.message}`);
+    const errEvent = { id: uuidv4(), sessionId, timestamp: new Date().toISOString(), type: 'error', data: { message: `Failed to spawn claude: ${err.message}` } };
+    session.events.push(errEvent);
+    sendToClient(ws, errEvent);
+    session.status = 'ended';
+  });
 
-  // Parse stdout line-by-line
-  let buffer = '';
+  // Send initialize handshake
+  const initRequestId = 'req_1_' + uuidv4().replace(/-/g, '').slice(0, 8);
+  proc.stdin.write(JSON.stringify({
+    type: 'control_request',
+    request_id: initRequestId,
+    request: { subtype: 'initialize', hooks: null },
+  }) + '\n');
+  console.log(`Sent initialize handshake for session ${sessionId}`);
+
+  // Parse stdout as NDJSON
+  let jsonBuffer = '';
+
   proc.stdout.on('data', (chunk) => {
-    buffer += chunk.toString();
-    const lines = buffer.split('\n');
-    buffer = lines.pop();
+    jsonBuffer += chunk.toString();
+    const lines = jsonBuffer.split('\n');
+    jsonBuffer = lines.pop();
     for (const line of lines) {
-      if (!line.trim()) continue;
+      const trimmed = line.trim();
+      if (!trimmed || !trimmed.startsWith('{')) continue;
       try {
-        const parsed = JSON.parse(line);
-        const event = mapClaudeEvent(sessionId, parsed);
-        if (event) {
+        const parsed = JSON.parse(trimmed);
+
+        // Handle init handshake response
+        if (parsed.type === 'control_response' && !session.initialized) {
+          const resp = parsed.response || {};
+          if (resp.request_id === initRequestId) {
+            session.initialized = true;
+            console.log(`Session ${sessionId} initialized (${resp.subtype})`);
+            sendToClient(ws, { type: 'sessionReady', sessionId });
+            // Send any queued prompts
+            if (session._pendingPrompts) {
+              for (const text of session._pendingPrompts) {
+                const userMsg = JSON.stringify({
+                  type: 'user',
+                  message: { role: 'user', content: text },
+                  parent_tool_use_id: null,
+                  session_id: 'default',
+                });
+                proc.stdin.write(userMsg + '\n');
+                console.log(`Sent queued prompt to session ${sessionId}`);
+              }
+              session._pendingPrompts = [];
+            }
+          }
+          continue;
+        }
+
+        // Handle permission requests from Claude (control_request)
+        if (parsed.type === 'control_request') {
+          const req = parsed.request || {};
+          if (req.subtype === 'can_use_tool') {
+            const event = {
+              id: uuidv4(), sessionId,
+              timestamp: new Date().toISOString(),
+              type: 'permissionRequest',
+              data: {
+                toolName: req.tool_name || 'Unknown',
+                command: JSON.stringify(req.input || {}),
+                toolUseId: parsed.request_id || '',
+                input: req.input || {},
+              },
+            };
+            session.events.push(event);
+            sendToClient(ws, event);
+          }
+          continue;
+        }
+
+        // Skip other control messages
+        if (parsed.type === 'control_response' || parsed.type === 'control_cancel_request') continue;
+
+        // Map Claude events for timeline
+        const result = mapClaudeEvent(sessionId, parsed);
+        if (!result) continue;
+        const events = Array.isArray(result) ? result : [result];
+        for (const event of events) {
           session.events.push(event);
           sendToClient(ws, event);
         }
-      } catch (e) { /* skip non-JSON */ }
+      } catch (e) { /* not JSON, skip */ }
     }
   });
 
   proc.stderr.on('data', (chunk) => {
     const errText = chunk.toString().trim();
     if (errText) {
+      console.error(`Session ${sessionId} stderr: ${errText.slice(0, 200)}`);
       const errEvent = { id: uuidv4(), sessionId, timestamp: new Date().toISOString(), type: 'error', data: { message: errText } };
       session.events.push(errEvent);
       sendToClient(ws, errEvent);
@@ -809,9 +884,14 @@ function createClaudeSession(ws, options) {
 
   proc.on('exit', (code) => {
     session.status = 'ended';
+    console.log(`Session ${sessionId} exited with code ${code}`);
     const endEvent = { id: uuidv4(), sessionId, timestamp: new Date().toISOString(), type: 'sessionEnd', data: { reason: code === 0 ? 'completed' : 'error', totalTokens: 0, cost: 0 } };
     session.events.push(endEvent);
     sendToClient(ws, endEvent);
+    // Also notify terminal view
+    if (ws.readyState === 1) {
+      ws.send(JSON.stringify({ type: 'ptyExit', sessionId, exitCode: code }));
+    }
   });
 
   return sessionId;
@@ -822,19 +902,196 @@ function mapClaudeEvent(sessionId, parsed) {
   const timestamp = new Date().toISOString();
   const type = parsed.type || '';
 
-  if (type === 'system') return { id, sessionId, timestamp, type: 'sessionStart', data: parsed };
-  if (type === 'assistant' && parsed.subtype === 'thinking') return { id, sessionId, timestamp, type: 'assistantThinking', data: { thinking: parsed.content || '', done: parsed.done || false } };
-  if (type === 'assistant' && parsed.subtype === 'text') return { id, sessionId, timestamp, type: 'assistantText', data: { text: parsed.content || '', done: parsed.done || false } };
-  if (type === 'assistant') return { id, sessionId, timestamp, type: 'assistantText', data: { text: parsed.content || JSON.stringify(parsed), done: parsed.done !== false } };
-  if (type === 'tool_use') return { id, sessionId, timestamp, type: 'toolUse', data: { toolName: parsed.name || 'Unknown', input: parsed.input || {}, toolUseId: parsed.tool_use_id || uuidv4() } };
-  if (type === 'tool_result') return { id, sessionId, timestamp, type: 'toolResult', data: { toolUseId: parsed.tool_use_id || '', success: !parsed.is_error, output: parsed.content || '', duration: 0 } };
-  if (type === 'result') return { id, sessionId, timestamp, type: 'sessionEnd', data: { reason: 'completed', totalTokens: parsed.usage?.total_tokens || 0, cost: parsed.cost || 0 } };
-  if (type === 'error') return { id, sessionId, timestamp, type: 'error', data: { message: parsed.message || parsed.error || JSON.stringify(parsed) } };
-  return { id, sessionId, timestamp, type: 'assistantText', data: { text: JSON.stringify(parsed), done: true } };
+  // System events: init, hooks, etc.
+  if (type === 'system') {
+    if (parsed.subtype === 'init') {
+      return { id, sessionId, timestamp, type: 'sessionStart', data: {
+        model: parsed.model || '',
+        cwd: parsed.cwd || '',
+        tools: parsed.tools || [],
+        permissionMode: parsed.permissionMode || 'default',
+        session_id: parsed.session_id || sessionId,
+        claude_code_version: parsed.claude_code_version || '',
+        apiKeySource: parsed.apiKeySource || '',
+      }};
+    }
+    // Skip hook events — they're internal noise
+    return null;
+  }
+
+  // Assistant message: {"type":"assistant","message":{"content":[{"type":"text","text":"..."}],...}}
+  if (type === 'assistant') {
+    const msg = parsed.message;
+    if (!msg) return null;
+
+    const content = msg.content || [];
+    const texts = [];
+    const toolUses = [];
+
+    for (const block of content) {
+      if (block.type === 'text') {
+        texts.push(block.text || '');
+      } else if (block.type === 'thinking') {
+        // Extended thinking block
+        return { id, sessionId, timestamp, type: 'assistantThinking', data: { thinking: block.thinking || '', done: true } };
+      } else if (block.type === 'tool_use') {
+        toolUses.push(block);
+      }
+    }
+
+    // Emit text blocks
+    const events = [];
+    if (texts.length > 0) {
+      events.push({ id, sessionId, timestamp, type: 'assistantText', data: {
+        text: texts.join('\n'),
+        done: msg.stop_reason === 'end_turn',
+        model: msg.model || '',
+        usage: msg.usage || {},
+      }});
+    }
+
+    // Emit tool_use blocks from within assistant message
+    for (const tu of toolUses) {
+      events.push({ id: uuidv4(), sessionId, timestamp, type: 'toolUse', data: {
+        toolName: tu.name || 'Unknown',
+        input: tu.input || {},
+        toolUseId: tu.id || uuidv4(),
+      }});
+    }
+
+    // Return array of events or single event
+    if (events.length === 0) return null;
+    if (events.length === 1) return events[0];
+    return events; // caller must handle array
+  }
+
+  // Tool use (top-level, streaming format)
+  if (type === 'tool_use') {
+    return { id, sessionId, timestamp, type: 'toolUse', data: {
+      toolName: parsed.name || 'Unknown',
+      input: parsed.input || {},
+      toolUseId: parsed.tool_use_id || parsed.id || uuidv4(),
+    }};
+  }
+
+  // Tool result
+  if (type === 'tool_result') {
+    return { id, sessionId, timestamp, type: 'toolResult', data: {
+      toolUseId: parsed.tool_use_id || '',
+      success: !parsed.is_error,
+      output: typeof parsed.content === 'string' ? parsed.content : JSON.stringify(parsed.content || ''),
+      duration: parsed.duration_ms || 0,
+    }};
+  }
+
+  // Result event — turn complete, but NOT session end (session stays alive for multi-turn)
+  if (type === 'result') {
+    return { id, sessionId, timestamp, type: 'turnComplete', data: {
+      reason: parsed.subtype === 'success' ? 'completed' : 'error',
+      result: parsed.result || '',
+      totalTokens: (parsed.usage?.input_tokens || 0) + (parsed.usage?.output_tokens || 0),
+      cost: parsed.total_cost_usd || 0,
+      duration: parsed.duration_ms || 0,
+      model: parsed.modelUsage ? Object.keys(parsed.modelUsage)[0] : '',
+      usage: parsed.usage || {},
+    }};
+  }
+
+  // Control requests (permission prompts from Claude)
+  if (type === 'control_request') {
+    const req = parsed.request || {};
+    if (req.subtype === 'can_use_tool') {
+      return { id, sessionId, timestamp, type: 'permissionRequest', data: {
+        toolName: req.tool_name || 'Unknown',
+        command: JSON.stringify(req.input || {}),
+        toolUseId: parsed.request_id || '',
+        input: req.input || {},
+      }};
+    }
+    // Other control requests (initialize responses, etc.) — skip
+    return null;
+  }
+
+  // Control responses — skip
+  if (type === 'control_response' || type === 'control_cancel_request') return null;
+
+  // Rate limit events
+  if (type === 'rate_limit_event') return null;
+
+  // Error
+  if (type === 'error') {
+    return { id, sessionId, timestamp, type: 'error', data: {
+      message: parsed.message || parsed.error || JSON.stringify(parsed),
+    }};
+  }
+
+  // Unknown — skip instead of dumping raw JSON
+  return null;
 }
 
 function sendToClient(ws, event) {
   if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(event));
+}
+
+// ── PTY Sessions (real terminal via pty-proxy.py) ──
+const ptySessions = new Map();
+
+function createPtySession(ws, options) {
+  const { spawn } = require('child_process');
+  const sessionId = uuidv4();
+  const claudePath = process.env.CLAUDE_PATH || '/Users/dev/.local/bin/claude';
+  let cwd = options.projectDir || process.cwd();
+  if (cwd.startsWith('~')) cwd = cwd.replace('~', require('os').homedir());
+  const fs = require('fs');
+  if (!fs.existsSync(cwd)) { fs.mkdirSync(cwd, { recursive: true }); }
+
+  const claudeArgs = [];
+  if (options.model && options.model !== 'auto') claudeArgs.push('--model', options.model);
+  if (options.permissionMode && options.permissionMode !== 'default') claudeArgs.push('--permission-mode', options.permissionMode);
+  if (options.dangerouslySkipPermissions) claudeArgs.push('--dangerously-skip-permissions');
+  if (options.resumeSessionId) claudeArgs.push('--resume', options.resumeSessionId);
+
+  const cols = options.cols || 80;
+  const rows = options.rows || 24;
+  const proxyPath = require('path').join(__dirname, 'pty-proxy.py');
+
+  console.log(`PTY spawning: ${claudePath} ${claudeArgs.join(' ')} in ${cwd} (${cols}x${rows})`);
+
+  const proc = spawn('python3', ['-u', proxyPath, String(cols), String(rows), claudePath, ...claudeArgs], {
+    cwd,
+    stdio: ['pipe', 'pipe', 'pipe'],
+    env: { ...process.env, PATH: process.env.PATH + ':/Users/dev/.local/bin' },
+  });
+
+  const session = { id: sessionId, proc, options, status: 'active', ws };
+  ptySessions.set(sessionId, session);
+
+  proc.stdout.on('data', (data) => {
+    if (ws.readyState === 1) {
+      // Send raw bytes as base64 to preserve binary terminal data
+      ws.send(JSON.stringify({ type: 'ptyData', sessionId, data: data.toString('base64'), encoding: 'base64' }));
+    }
+  });
+
+  proc.stderr.on('data', (data) => {
+    console.error(`PTY stderr [${sessionId}]: ${data.toString().slice(0, 200)}`);
+  });
+
+  proc.on('exit', (code) => {
+    session.status = 'ended';
+    if (ws.readyState === 1) {
+      ws.send(JSON.stringify({ type: 'ptyExit', sessionId, exitCode: code }));
+    }
+    ptySessions.delete(sessionId);
+    console.log(`PTY session ${sessionId} exited with code ${code}`);
+  });
+
+  proc.on('error', (err) => {
+    console.error(`PTY spawn error [${sessionId}]: ${err.message}`);
+    session.status = 'ended';
+  });
+
+  return sessionId;
 }
 
 function stopSession(sessionId) {
@@ -856,25 +1113,83 @@ wss.on('connection', (ws) => {
       switch (msg.action) {
         case 'createSession': {
           const sid = createClaudeSession(ws, msg.options || { projectDir: msg.projectDir });
+          // Send session ID back so client knows which session to listen for
+          sendToClient(ws, { type: 'sessionCreated', sessionId: sid, clientRequestId: msg.requestId || null });
+          console.log(`Session created: ${sid}`);
           break;
         }
         case 'prompt': {
+          console.log(`Prompt for session ${msg.sessionId}: "${(msg.text || '').substring(0, 50)}"`);
           const session = sessions.get(msg.sessionId);
+          if (session) {
+            console.log(`Session found — status: ${session.status}, proc: ${!!session.proc}, proc.pid: ${session.proc?.pid}, proc.killed: ${session.proc?.killed}`);
+          }
           if (session && session.proc && session.status === 'active') {
-            session.proc.stdin.write(JSON.stringify({ type: 'user', content: msg.text }) + '\n');
+            if (!session.initialized) {
+              console.log(`Session ${msg.sessionId} not yet initialized, queuing prompt`);
+              // Queue the prompt and send once initialized
+              if (!session._pendingPrompts) session._pendingPrompts = [];
+              session._pendingPrompts.push(msg.text);
+            } else {
+              // Send stream-json formatted user message
+              const userMsg = JSON.stringify({
+                type: 'user',
+                message: { role: 'user', content: msg.text },
+                parent_tool_use_id: null,
+                session_id: 'default',
+              });
+              session.proc.stdin.write(userMsg + '\n');
+              console.log(`Sent prompt to session ${msg.sessionId}`);
+            }
             const userEvent = { id: uuidv4(), sessionId: msg.sessionId, timestamp: new Date().toISOString(), type: 'userMessage', data: { text: msg.text } };
             session.events.push(userEvent);
             sendToClient(ws, userEvent);
+          } else {
+            console.log(`Session ${msg.sessionId} not active. Available: ${[...sessions.keys()].join(', ')}`);
+          }
+          break;
+        }
+        case 'createPtySession': {
+          const sid = createPtySession(ws, msg.options || { projectDir: msg.projectDir });
+          sendToClient(ws, { type: 'ptySessionCreated', sessionId: sid });
+          console.log(`PTY session created: ${sid}`);
+          break;
+        }
+        case 'ptyInput': {
+          const s = sessions.get(msg.sessionId);
+          if (s && s.proc && s.status === 'active') {
+            s.proc.stdin.write(msg.data);
+          }
+          break;
+        }
+        case 'ptyResize': {
+          const s = sessions.get(msg.sessionId);
+          if (s && s.proc && s.status === 'active') {
+            // Send resize command to pty-proxy
+            s.proc.stdin.write(`RESIZE ${msg.cols} ${msg.rows}\n`);
           }
           break;
         }
         case 'stop':
           stopSession(msg.sessionId);
+          // Also stop PTY sessions
+          const ptyS = ptySessions.get(msg.sessionId);
+          if (ptyS && ptyS.term) { ptyS.term.kill(); }
           break;
         case 'permission': {
           const s = sessions.get(msg.sessionId);
           if (s && s.proc) {
-            s.proc.stdin.write(JSON.stringify({ type: 'permission_response', tool_use_id: msg.toolUseId, allowed: msg.allowed }) + '\n');
+            const response = msg.allowed
+              ? { behavior: 'allow', updatedInput: null }
+              : { behavior: 'deny', message: 'Denied by user' };
+            s.proc.stdin.write(JSON.stringify({
+              type: 'control_response',
+              response: {
+                subtype: 'success',
+                request_id: msg.toolUseId,
+                response,
+              },
+            }) + '\n');
           }
           break;
         }

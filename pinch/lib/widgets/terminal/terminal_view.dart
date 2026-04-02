@@ -1,175 +1,177 @@
 import 'package:flutter/material.dart';
+import 'package:xterm/xterm.dart' as xterm;
 
 import '../../models/session_event.dart';
-import '../../theme/tva_colors.dart';
 
-const _monoStyle = TextStyle(
-  fontFamily: 'IBM Plex Mono',
-  fontFamilyFallback: ['monospace'],
-  fontSize: 11,
-  height: 1.9,
-);
-
-class TerminalView extends StatefulWidget {
+/// Terminal view — renders session events through xterm.dart
+/// to look like the real Claude Code CLI output.
+class PinchTerminalView extends StatefulWidget {
   final List<SessionEvent> events;
 
-  const TerminalView({super.key, required this.events});
+  const PinchTerminalView({super.key, required this.events});
 
   @override
-  State<TerminalView> createState() => _TerminalViewState();
+  State<PinchTerminalView> createState() => _PinchTerminalViewState();
 }
 
-class _TerminalViewState extends State<TerminalView>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _cursorController;
+class _PinchTerminalViewState extends State<PinchTerminalView> {
+  late xterm.Terminal _terminal;
+  int _lastRendered = 0;
+
+  static const _theme = xterm.TerminalTheme(
+    cursor: Color(0xFFC08818),
+    selection: Color(0x40C08818),
+    foreground: Color(0xFFDDD0B8),
+    background: Color(0xFF0A0906),
+    black: Color(0xFF0A0906),
+    red: Color(0xFFC03828),
+    green: Color(0xFF52902C),
+    yellow: Color(0xFFC08818),
+    blue: Color(0xFF4488DD),
+    magenta: Color(0xFF8855CC),
+    cyan: Color(0xFF3E8480),
+    white: Color(0xFFDDD0B8),
+    brightBlack: Color(0xFF5A4E3A),
+    brightRed: Color(0xFFE06050),
+    brightGreen: Color(0xFF6AB040),
+    brightYellow: Color(0xFFD4A428),
+    brightBlue: Color(0xFF6699EE),
+    brightMagenta: Color(0xFFAA77EE),
+    brightCyan: Color(0xFF50A8A0),
+    brightWhite: Color(0xFFF0E8D8),
+    searchHitBackground: Color(0x40C08818),
+    searchHitBackgroundCurrent: Color(0x80C08818),
+    searchHitForeground: Color(0xFFDDD0B8),
+  );
 
   @override
   void initState() {
     super.initState();
-    _cursorController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 1),
-    )..repeat();
+    _terminal = xterm.Terminal(maxLines: 10000);
+    _renderNew();
   }
 
   @override
-  void dispose() {
-    _cursorController.dispose();
-    super.dispose();
+  void didUpdateWidget(PinchTerminalView old) {
+    super.didUpdateWidget(old);
+    if (widget.events.length > _lastRendered) {
+      _renderNew();
+    }
   }
 
-  List<InlineSpan> _buildSpansForEvent(SessionEvent event) {
-    switch (event.type) {
+  void _renderNew() {
+    for (int i = _lastRendered; i < widget.events.length; i++) {
+      _writeEvent(widget.events[i]);
+    }
+    _lastRendered = widget.events.length;
+  }
+
+  void _w(String s) => _terminal.write(s);
+
+  // ANSI helpers
+  static const _reset = '\x1b[0m';
+  static const _bold = '\x1b[1m';
+  static const _dim = '\x1b[2m';
+  static const _italic = '\x1b[3m';
+  // Colors matching Claude Code's theme
+  static const _clawd = '\x1b[38;2;215;119;87m'; // clawd orange
+  static const _amber = '\x1b[38;2;192;136;24m';
+  static const _green = '\x1b[38;2;82;144;44m';
+  static const _teal = '\x1b[38;2;62;132;128m';
+  static const _rust = '\x1b[38;2;139;46;18m';
+  static const _purple = '\x1b[38;2;136;85;204m';
+  static const _txt2 = '\x1b[38;2;154;136;104m';
+  static const _txt3 = '\x1b[38;2;90;78;58m';
+
+  void _writeEvent(SessionEvent e) {
+    switch (e.type) {
+      case EventType.sessionStart:
+        final model = e.data['model'] as String? ?? '';
+        final cwd = e.data['cwd'] as String? ?? '';
+        _w('$_bold${_clawd}Claude Code$_reset');
+        if (model.isNotEmpty) _w('  $_txt3$model$_reset');
+        _w('\r\n');
+        if (cwd.isNotEmpty) _w('$_txt3$cwd$_reset\r\n');
+        _w('$_txt3${'─' * 60}$_reset\r\n\r\n');
+
       case EventType.userMessage:
-        final text = event.data['text'] as String? ?? '';
-        return [
-          TextSpan(text: '> ', style: _monoStyle.copyWith(color: TvaColors.txt3)),
-          TextSpan(text: '$text\n', style: _monoStyle.copyWith(color: TvaColors.txt)),
-        ];
+        final text = e.data['text'] as String? ?? '';
+        _w('$_bold${_amber}❯$_reset $text\r\n\r\n');
+
+      case EventType.assistantThinking:
+        final text = e.data['thinking'] as String? ?? '';
+        if (text.isNotEmpty) {
+          _w('$_dim$_purple✦ $text$_reset\r\n');
+        }
 
       case EventType.assistantText:
-        final text = event.data['text'] as String? ?? '';
-        return [
-          TextSpan(
-            text: '$text\n',
-            style: _monoStyle.copyWith(color: TvaColors.txt.withValues(alpha: 0.75)),
-          ),
-        ];
+        final text = e.data['text'] as String? ?? '';
+        // Render Claude's response with word wrapping
+        for (final line in text.split('\n')) {
+          _w('$_clawd$line$_reset\r\n');
+        }
+        _w('\r\n');
 
       case EventType.toolUse:
-        return _buildToolUseSpans(event);
+        final name = e.data['toolName'] as String? ?? '';
+        final input = e.data['input'] as Map<String, dynamic>? ?? {};
+        final target = input['file_path'] ?? input['path'] ?? input['command'] ?? input['pattern'] ?? '';
+        final color = _toolColor(name);
+        _w('  $color$_bold$name$_reset $_txt2$target$_reset\r\n');
 
       case EventType.toolResult:
-        return _buildToolResultSpans(event);
+        final success = e.data['success'] as bool? ?? true;
+        final output = e.data['output'] as String? ?? '';
+        final duration = e.data['duration'] as num?;
+        if (output.isNotEmpty) {
+          final color = success ? _green : _rust;
+          final lines = output.split('\n');
+          final display = lines.length > 20 ? [...lines.take(20), '... (${lines.length - 20} more lines)'] : lines;
+          for (final line in display) {
+            _w('  $color$line$_reset\r\n');
+          }
+        }
+        if (duration != null && duration > 0) {
+          _w('  $_txt3${(duration / 1000).toStringAsFixed(1)}s$_reset\r\n');
+        }
 
       case EventType.permissionRequest:
-        final command = event.data['command'] as String? ?? '';
-        return [
-          TextSpan(
-            text: '? Permission: $command\n',
-            style: _monoStyle.copyWith(color: TvaColors.amber),
-          ),
-        ];
+        final name = e.data['toolName'] as String? ?? '';
+        _w('\r\n$_amber⚠  Permission required: $name$_reset\r\n\r\n');
+
+      case EventType.error:
+        final msg = e.data['message'] as String? ?? '';
+        _w('$_rust✗ $msg$_reset\r\n');
+
+      case EventType.turnComplete:
+        final cost = (e.data['cost'] as num?)?.toStringAsFixed(4) ?? '0';
+        _w('$_txt3(\$$cost)$_reset\r\n\r\n');
+
+      case EventType.sessionEnd:
+        final reason = e.data['reason'] as String? ?? '';
+        final cost = (e.data['cost'] as num?)?.toStringAsFixed(4) ?? '0';
+        _w('\r\n$_txt3─── session $reason · \$$cost ───$_reset\r\n');
 
       default:
-        return [];
+        break;
     }
   }
 
-  List<InlineSpan> _buildToolUseSpans(SessionEvent event) {
-    final toolName = event.data['toolName'] as String? ?? '';
-    final path = event.data['path'] as String? ?? '';
-
-    switch (toolName) {
-      case 'Read':
-        return [
-          TextSpan(text: '* ', style: _monoStyle.copyWith(color: TvaColors.greenBr)),
-          TextSpan(text: 'Read ', style: _monoStyle.copyWith(color: TvaColors.amber)),
-          TextSpan(text: '$path\n', style: _monoStyle.copyWith(color: TvaColors.clawd)),
-        ];
-
-      case 'Edit':
-        final added = event.data['added'] as int? ?? 0;
-        final removed = event.data['removed'] as int? ?? 0;
-        return [
-          TextSpan(text: '* ', style: _monoStyle.copyWith(color: TvaColors.greenBr)),
-          TextSpan(text: 'Edit ', style: _monoStyle.copyWith(color: TvaColors.amber)),
-          TextSpan(text: '$path ', style: _monoStyle.copyWith(color: TvaColors.clawd)),
-          TextSpan(text: '+$added -$removed\n', style: _monoStyle.copyWith(color: TvaColors.txt3)),
-        ];
-
-      case 'Bash':
-        final command = event.data['command'] as String? ?? '';
-        return [
-          TextSpan(text: '~ ', style: _monoStyle.copyWith(color: TvaColors.amber)),
-          TextSpan(text: 'Bash ', style: _monoStyle.copyWith(color: TvaColors.amber)),
-          TextSpan(text: '$command ', style: _monoStyle.copyWith(color: TvaColors.txt3)),
-          TextSpan(text: 'RUNNING\n', style: _monoStyle.copyWith(color: TvaColors.amber)),
-        ];
-
-      default:
-        return [
-          TextSpan(text: '* ', style: _monoStyle.copyWith(color: TvaColors.greenBr)),
-          TextSpan(text: '$toolName ', style: _monoStyle.copyWith(color: TvaColors.amber)),
-          TextSpan(text: '$path\n', style: _monoStyle.copyWith(color: TvaColors.clawd)),
-        ];
-    }
-  }
-
-  List<InlineSpan> _buildToolResultSpans(SessionEvent event) {
-    final success = event.data['success'] as bool? ?? true;
-    final toolName = event.data['toolName'] as String? ?? '';
-    final path = event.data['path'] as String? ?? '';
-    final duration = event.data['duration'] as num? ?? 0;
-
-    if (success) {
-      return [
-        TextSpan(text: '* ', style: _monoStyle.copyWith(color: TvaColors.greenBr)),
-        TextSpan(text: '$toolName ', style: _monoStyle.copyWith(color: TvaColors.txt)),
-        TextSpan(text: '$path ', style: _monoStyle.copyWith(color: TvaColors.txt)),
-        TextSpan(text: '${duration}s\n', style: _monoStyle.copyWith(color: TvaColors.txt)),
-      ];
-    } else {
-      final output = event.data['output'] as String? ?? 'Error';
-      return [
-        TextSpan(
-          text: '$output\n',
-          style: _monoStyle.copyWith(color: const Color(0xFFC03828)),
-        ),
-      ];
-    }
+  String _toolColor(String name) {
+    return switch (name) {
+      'Read' || 'Glob' || 'Grep' => _teal,
+      'Edit' || 'Write' => _green,
+      'Bash' => _amber,
+      _ => _txt2,
+    };
   }
 
   @override
   Widget build(BuildContext context) {
-    final spans = <InlineSpan>[];
-    for (final event in widget.events) {
-      spans.addAll(_buildSpansForEvent(event));
-    }
-
-    return Container(
-      color: TvaColors.termBg,
-      padding: const EdgeInsets.all(14),
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SelectableText.rich(
-              TextSpan(children: spans),
-            ),
-            AnimatedBuilder(
-              animation: _cursorController,
-              builder: (context, _) => Container(
-                width: 6,
-                height: 10,
-                color: _cursorController.value < 0.5
-                    ? TvaColors.amber
-                    : Colors.transparent,
-              ),
-            ),
-          ],
-        ),
-      ),
+    return xterm.TerminalView(
+      _terminal,
+      theme: _theme,
+      textStyle: const xterm.TerminalStyle(fontFamily: 'IBMPlexMono', fontSize: 13),
     );
   }
 }

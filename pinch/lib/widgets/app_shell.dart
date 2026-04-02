@@ -8,7 +8,6 @@ import '../theme/tva_colors.dart';
 import 'masthead.dart';
 import 'rail.dart';
 import 'sidebar.dart';
-import 'ticker.dart';
 
 class AppShell extends ConsumerWidget {
   final Widget child;
@@ -28,12 +27,7 @@ class AppShell extends ConsumerWidget {
             // Ticker
             Consumer(builder: (context, ref, _) {
               final meta = ref.watch(sessionMetaProvider);
-              final clawdState = ref.watch(clawdStateProvider);
-              final stateText = clawdState.name.toUpperCase();
-              return Ticker(
-                text:
-                    'SESSION ACTIVE — MODEL: ${meta.model ?? "OPUS 4.6"} — STATUS: $stateText — PERMISSION MODE: DEFAULT',
-              );
+              return _SessionInfoBar(meta: meta);
             }),
             Container(height: 1, color: TvaColors.brd),
             // Main body
@@ -114,5 +108,114 @@ class AppShell extends ConsumerWidget {
       case 3:
         GoRouter.of(context).go('/settings');
     }
+  }
+}
+
+class _SessionInfoBar extends StatelessWidget {
+  final SessionMeta meta;
+  const _SessionInfoBar({required this.meta});
+
+  static const _mono = TextStyle(fontFamily: 'IBMPlexMono');
+
+  bool get _isDangerous {
+    final p = meta.permissionMode?.toLowerCase() ?? '';
+    return p == 'bypasspermissions' || p == 'dontask';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasMeta = meta.model != null || meta.cwd != null;
+
+    return Container(
+      height: 28,
+      color: _isDangerous ? const Color(0xFF1A0A06) : TvaColors.bgInset,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Row(
+        children: [
+          // Version
+          if (meta.version != null)
+            _chip('v${meta.version!}', TvaColors.txt3),
+
+          // Model
+          if (meta.model != null) ...[
+            const SizedBox(width: 8),
+            _chip(meta.model!, TvaColors.amber),
+          ],
+
+          // CWD
+          if (meta.cwd != null) ...[
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                meta.cwd!,
+                style: _mono.copyWith(
+                  fontSize: 9,
+                  color: TvaColors.txt3,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+
+          const Spacer(),
+
+          // Permission mode — big and red if dangerous
+          if (meta.permissionMode != null)
+            _permBadge(meta.permissionMode!),
+
+          if (!hasMeta)
+            Text(
+              'No active session',
+              style: _mono.copyWith(fontSize: 9, color: TvaColors.txt3),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _chip(String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Text(
+        text,
+        style: _mono.copyWith(
+          fontSize: 8,
+          color: color,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+
+  Widget _permBadge(String mode) {
+    final isDanger = _isDangerous;
+    final color = isDanger ? TvaColors.rust : TvaColors.txt3;
+    final bgColor = isDanger ? const Color(0x30C03828) : Colors.transparent;
+
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: isDanger ? 10 : 6,
+        vertical: 2,
+      ),
+      decoration: BoxDecoration(
+        color: bgColor,
+        border: Border.all(
+          color: isDanger ? TvaColors.rust : color.withValues(alpha: 0.3),
+          width: isDanger ? 2 : 1,
+        ),
+      ),
+      child: Text(
+        mode.toUpperCase(),
+        style: _mono.copyWith(
+          fontSize: isDanger ? 9 : 8,
+          fontWeight: isDanger ? FontWeight.w700 : FontWeight.normal,
+          color: color,
+          letterSpacing: isDanger ? 2 : 0.5,
+        ),
+      ),
+    );
   }
 }

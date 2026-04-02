@@ -5,8 +5,17 @@ import '../../theme/tva_colors.dart';
 
 class PermissionBar extends StatelessWidget {
   final SessionEvent event;
+  final VoidCallback? onAllow;
+  final VoidCallback? onDeny;
+  final VoidCallback? onAlways;
 
-  const PermissionBar({super.key, required this.event});
+  const PermissionBar({
+    super.key,
+    required this.event,
+    this.onAllow,
+    this.onDeny,
+    this.onAlways,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +41,7 @@ class PermissionBar extends StatelessWidget {
                 const Text(
                   'PERMISSION REQUIRED',
                   style: TextStyle(
-                    fontFamily: 'monospace',
+                    fontFamily: 'IBMPlexMono',
                     fontSize: 7,
                     color: TvaColors.txt3,
                     letterSpacing: 2,
@@ -41,7 +50,7 @@ class PermissionBar extends StatelessWidget {
                 Text(
                   command,
                   style: const TextStyle(
-                    fontFamily: 'monospace',
+                    fontFamily: 'IBMPlexMono',
                     fontSize: 10,
                     color: TvaColors.clawd,
                   ),
@@ -49,16 +58,19 @@ class PermissionBar extends StatelessWidget {
               ],
             ),
           ),
-          const Row(
+          Row(
             children: [
-              _PermButton(label: 'ALLOW', color: TvaColors.greenBr),
-              SizedBox(width: 4),
-              _PermButton(label: 'DENY', color: TvaColors.rust),
-              SizedBox(width: 4),
+              _PermButton(
+                  label: 'ALLOW', color: TvaColors.greenBr, onTap: onAllow),
+              const SizedBox(width: 4),
+              _PermButton(
+                  label: 'DENY', color: TvaColors.rust, onTap: onDeny),
+              const SizedBox(width: 4),
               _PermButton(
                 label: 'ALWAYS',
                 color: TvaColors.txt3,
                 borderColor: TvaColors.brd,
+                onTap: onAlways,
               ),
             ],
           ),
@@ -68,31 +80,48 @@ class PermissionBar extends StatelessWidget {
   }
 }
 
-class _PermButton extends StatelessWidget {
+class _PermButton extends StatefulWidget {
   final String label;
   final Color color;
   final Color? borderColor;
+  final VoidCallback? onTap;
 
   const _PermButton({
     required this.label,
     required this.color,
     this.borderColor,
+    this.onTap,
   });
 
   @override
+  State<_PermButton> createState() => _PermButtonState();
+}
+
+class _PermButtonState extends State<_PermButton> {
+  bool _hovering = false;
+
+  @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        border: Border.all(color: borderColor ?? color),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontFamily: 'monospace',
-          fontSize: 8,
-          color: color,
-          letterSpacing: 1,
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovering = true),
+      onExit: (_) => setState(() => _hovering = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: _hovering ? widget.color.withValues(alpha: 0.15) : null,
+            border: Border.all(color: widget.borderColor ?? widget.color),
+          ),
+          child: Text(
+            widget.label,
+            style: TextStyle(
+              fontFamily: 'IBMPlexMono',
+              fontSize: 8,
+              color: widget.color,
+              letterSpacing: 1,
+            ),
+          ),
         ),
       ),
     );

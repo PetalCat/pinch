@@ -5,10 +5,13 @@ import 'connection_provider.dart';
 /// Currently selected project
 final activeProjectProvider = StateProvider<Project?>((ref) => null);
 
-/// All projects: merged from scan + session history
+/// All projects: merged from scan + session history, deduplicated by directory
 final allProjectsProvider = FutureProvider<List<Project>>((ref) async {
   final conn = ref.watch(connectionServiceProvider);
-  return conn.getMyProjects();
+  final projects = await conn.getMyProjects();
+  // Deduplicate by directory path — keep the first occurrence
+  final seen = <String>{};
+  return projects.where((p) => seen.add(p.directory)).toList();
 });
 
 /// Recent projects from server (kept for backwards compat)

@@ -111,7 +111,7 @@ class MockConnectionService implements ConnectionService {
   Future<void> stopSession(String sessionId) async {}
   @override
   Future<void> respondToPermission(String toolUseId, bool allowed,
-      {bool always = false}) async {}
+      {bool always = false, String? sessionId}) async {}
   @override
   Future<List<SessionEvent>> getSessionHistory(String sessionId) async => [];
 
@@ -165,4 +165,5 @@ class MockConnectionService implements ConnectionService {
 
   @override
   Future<List<SessionEvent>> getHistoricalSession(String sessionId) async => [];
+
 }
