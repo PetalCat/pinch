@@ -22,8 +22,8 @@ class _PinchTerminalViewState extends State<PinchTerminalView> {
     cursor: Color(0xFFC08818),
     selection: Color(0x40C08818),
     foreground: Color(0xFFDDD0B8),
-    background: Color(0xFF0A0906),
-    black: Color(0xFF0A0906),
+    background: Color(0xFF060503),
+    black: Color(0xFF060503),
     red: Color(0xFFC03828),
     green: Color(0xFF52902C),
     yellow: Color(0xFFC08818),
@@ -171,7 +171,13 @@ class _PinchTerminalViewState extends State<PinchTerminalView> {
     return xterm.TerminalView(
       _terminal,
       theme: _theme,
-      textStyle: const xterm.TerminalStyle(fontFamily: 'IBMPlexMono', fontSize: 13),
+      textStyle: const xterm.TerminalStyle(
+        fontFamily: 'IBMPlexMono',
+        fontSize: 10,
+        height: 1.9,
+      ),
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 18),
+      cursorType: xterm.TerminalCursorType.block,
     );
   }
 }
