@@ -86,7 +86,7 @@ class _ClaudeMessageState extends State<ClaudeMessage>
     final showClawd = vis != ClawdVisibility.hidden;
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.only(bottom: 6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -116,9 +116,9 @@ class _ClaudeMessageState extends State<ClaudeMessage>
     );
   }
 
-  // Inline sprite: cellWidth=2.7, cellHeight=5.5 → 48.6w x 27.5h
-  static const _cellW = 2.7;
-  static const _cellH = 5.5;
+  // Inline sprite: cellWidth=1.8, cellHeight=4.0 → 32.4w x 20h
+  static const _cellW = 1.8;
+  static const _cellH = 4.0;
   static const _clawdH = _cellH * 5;
 
   Widget _buildClawdArea(ClawdVisibility vis) {
