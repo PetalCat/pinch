@@ -29,6 +29,7 @@ class _TimelineViewState extends State<TimelineView> {
   final ScrollController _scrollController = ScrollController();
   final ClawdWalkController _walkController = ClawdWalkController();
   int _prevEventCount = 0;
+  final Set<String> _seenEventIds = {};
 
   int get _lastClaudeIndex {
     for (int i = widget.events.length - 1; i >= 0; i--) {
@@ -108,9 +109,13 @@ class _TimelineViewState extends State<TimelineView> {
       itemCount: widget.events.length,
       itemBuilder: (context, index) {
         final event = widget.events[index];
-        return _TimelineNode(
-          event: event,
-          child: _buildEventWidget(event, index),
+        final isNew = _seenEventIds.add(event.id);
+        return _FadeInWrapper(
+          animate: isNew,
+          child: _TimelineNode(
+            event: event,
+            child: _buildEventWidget(event, index),
+          ),
         );
       },
     );
@@ -407,6 +412,58 @@ class _TurnCompleteBlock extends StatelessWidget {
           )),
         ],
       ),
+    );
+  }
+}
+
+class _FadeInWrapper extends StatefulWidget {
+  final bool animate;
+  final Widget child;
+  const _FadeInWrapper({required this.animate, required this.child});
+
+  @override
+  State<_FadeInWrapper> createState() => _FadeInWrapperState();
+}
+
+class _FadeInWrapperState extends State<_FadeInWrapper>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    if (widget.animate) {
+      _controller.forward();
+    } else {
+      _controller.value = 1.0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.animate) return widget.child;
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Opacity(
+          opacity: _controller.value,
+          child: Transform.translate(
+            offset: Offset(0, 6 * (1.0 - _controller.value)),
+            child: child,
+          ),
+        );
+      },
+      child: widget.child,
     );
   }
 }
