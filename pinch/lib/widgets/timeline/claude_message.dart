@@ -101,14 +101,14 @@ class _ClaudeMessageState extends State<ClaudeMessage>
               letterSpacing: 3,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           Text(
             widget.text,
             style: const TextStyle(
               fontFamily: 'IBMPlexSans',
               fontSize: 14,
               color: Color(0xBFC8B99A),
-              height: 1.5,
+              height: 1.45,
             ),
           ),
         ],
