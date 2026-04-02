@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../theme/tva_colors.dart';
-
 class ThinkingBlock extends StatefulWidget {
   final String text;
   final bool isDone;
@@ -118,8 +116,8 @@ class _ThinkingBlockState extends State<ThinkingBlock>
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                    ],
-                    const Spacer(),
+                    ] else
+                      const Spacer(),
                     AnimatedRotation(
                       turns: _collapsed ? 0 : 0.25,
                       duration: const Duration(milliseconds: 200),
