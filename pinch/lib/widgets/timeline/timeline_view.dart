@@ -188,31 +188,18 @@ class _TimelineNode extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.only(left: 16),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Timeline rail: dot + vertical line
-            SizedBox(
-              width: 20,
-              child: Column(
-                children: [
-                  const SizedBox(height: 4),
-                  _buildDot(),
-                  Expanded(
-                    child: Container(
-                      width: 1,
-                      color: TvaColors.brd,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            // Content
-            Expanded(child: child!),
-          ],
-        ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Timeline dot
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: _buildDot(),
+          ),
+          const SizedBox(width: 12),
+          // Content
+          Expanded(child: child!),
+        ],
       ),
     );
   }
