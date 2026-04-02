@@ -291,7 +291,7 @@ class _UserBlock extends StatelessWidget {
             'YOU',
             style: TextStyle(
               fontFamily: 'IBMPlexMono',
-              fontSize: 10,
+              fontSize: 12,
               color: TvaColors.txt3,
               letterSpacing: 3,
             ),
@@ -301,9 +301,9 @@ class _UserBlock extends StatelessWidget {
             text,
             style: const TextStyle(
               fontFamily: 'IBMPlexSans',
-              fontSize: 14,
+              fontSize: 16,
               color: TvaColors.txt,
-              height: 1.5,
+              height: 1.45,
             ),
           ),
         ],
@@ -329,7 +329,7 @@ class _ErrorBlock extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text('ERROR', style: TextStyle(
-            fontFamily: 'IBMPlexMono', fontSize: 8,
+            fontFamily: 'IBMPlexMono', fontSize: 10,
             color: Color(0xFFC03828), letterSpacing: 2,
           )),
           const SizedBox(width: 10),
@@ -362,12 +362,12 @@ class _SessionEndBlock extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text('SESSION $reason'.toUpperCase(), style: const TextStyle(
-            fontFamily: 'IBMPlexMono', fontSize: 8,
+            fontFamily: 'IBMPlexMono', fontSize: 10,
             color: TvaColors.txt3, letterSpacing: 2,
           )),
           const SizedBox(width: 12),
           Text('\$$cost', style: const TextStyle(
-            fontFamily: 'IBMPlexMono', fontSize: 8, color: TvaColors.txt3,
+            fontFamily: 'IBMPlexMono', fontSize: 10, color: TvaColors.txt3,
           )),
         ],
       ),
@@ -391,11 +391,11 @@ class _TurnCompleteBlock extends StatelessWidget {
         children: [
           if (durationStr.isNotEmpty)
             Text(durationStr, style: const TextStyle(
-              fontFamily: 'IBMPlexMono', fontSize: 8, color: TvaColors.txt3,
+              fontFamily: 'IBMPlexMono', fontSize: 10, color: TvaColors.txt3,
             )),
           if (durationStr.isNotEmpty) const SizedBox(width: 8),
           Text('\$$cost', style: const TextStyle(
-            fontFamily: 'IBMPlexMono', fontSize: 8, color: TvaColors.txt3,
+            fontFamily: 'IBMPlexMono', fontSize: 10, color: TvaColors.txt3,
           )),
         ],
       ),

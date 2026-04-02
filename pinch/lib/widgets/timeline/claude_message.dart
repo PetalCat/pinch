@@ -96,7 +96,7 @@ class _ClaudeMessageState extends State<ClaudeMessage>
             'CLAUDE',
             style: TextStyle(
               fontFamily: 'IBMPlexMono',
-              fontSize: 10,
+              fontSize: 12,
               color: TvaColors.amberDm,
               letterSpacing: 3,
             ),
@@ -106,7 +106,7 @@ class _ClaudeMessageState extends State<ClaudeMessage>
             widget.text.trim(),
             style: const TextStyle(
               fontFamily: 'IBMPlexSans',
-              fontSize: 14,
+              fontSize: 16,
               color: Color(0xBFC8B99A),
               height: 1.45,
             ),
@@ -116,9 +116,9 @@ class _ClaudeMessageState extends State<ClaudeMessage>
     );
   }
 
-  // Inline sprite: cellWidth=2.2, cellHeight=4.8 → ~40w x 24h
-  static const _cellW = 2.2;
-  static const _cellH = 4.8;
+  // Inline sprite: cellWidth=3.0, cellHeight=6.5 → 54w x 32.5h
+  static const _cellW = 3.0;
+  static const _cellH = 6.5;
   static const _clawdH = _cellH * 5;
 
   Widget _buildClawdArea(ClawdVisibility vis) {
