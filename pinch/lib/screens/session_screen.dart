@@ -33,6 +33,7 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
   List<SessionEvent> _historicalEvents = [];
   bool _isLoading = true;
   bool _isResuming = false;
+  String? _error;
 
   @override
   void initState() {
@@ -61,6 +62,7 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
       _historicalEvents = [];
       _isLoading = widget.isHistorical;
       _isResuming = false;
+      _error = null;
       if (widget.isHistorical) {
         _loadHistory();
       }
@@ -74,41 +76,68 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
   }
 
   Future<void> _loadHistory() async {
-    final conn = ref.read(connectionServiceProvider);
-    final events = await conn.getHistoricalSession(widget.sessionId);
-    if (mounted) {
-      setState(() {
-        _historicalEvents = events;
-        _isLoading = false;
-      });
+    try {
+      final conn = ref.read(connectionServiceProvider);
+      final events = await conn.getHistoricalSession(widget.sessionId);
+      if (mounted) {
+        setState(() {
+          _historicalEvents = events;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = 'Failed to load session: $e';
+          _isLoading = false;
+        });
+      }
     }
   }
 
   Future<void> _onSendPrompt(String text) async {
     if (!_isLive && !_isResuming) {
-      // First message on a historical session — resume it
       setState(() => _isResuming = true);
 
-      final conn = ref.read(connectionServiceProvider);
-      await conn.createSessionWithOptions(SessionOptions(
-        projectDir: '',
-        resumeSessionId: widget.sessionId,
-      ));
+      try {
+        final conn = ref.read(connectionServiceProvider);
+        await conn.createSessionWithOptions(SessionOptions(
+          projectDir: '',
+          resumeSessionId: widget.sessionId,
+        ));
 
-      if (mounted) {
-        setState(() {
-          _isLive = true;
-          _isResuming = false;
-        });
-        ref
-            .read(activeSessionEventsProvider.notifier)
-            .clearAndListenTo(widget.sessionId);
+        if (mounted) {
+          setState(() {
+            _isLive = true;
+            _isResuming = false;
+          });
+          ref
+              .read(activeSessionEventsProvider.notifier)
+              .clearAndListenTo(widget.sessionId);
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() {
+            _isResuming = false;
+            _error = 'Failed to resume session: $e';
+          });
+        }
+        return;
       }
     }
 
-    // Send the prompt
     final conn = ref.read(connectionServiceProvider);
     conn.sendPrompt(widget.sessionId, text);
+  }
+
+  void _onPermission(String toolUseId, bool allowed, {bool always = false}) {
+    final conn = ref.read(connectionServiceProvider);
+    conn.respondToPermission(toolUseId, allowed,
+        always: always, sessionId: widget.sessionId);
+  }
+
+  void _stopSession() {
+    ref.read(connectionServiceProvider).stopSession(widget.sessionId);
   }
 
   @override
@@ -121,12 +150,44 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
       if (_isLive) ...liveEvents,
     ];
 
+    final canSend = !meta.isEnded && !_isResuming;
+
     return Column(
       children: [
         _buildSessionBar(meta),
+        // Error banner
+        if (_error != null)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            color: const Color(0x30C03828),
+            child: Row(
+              children: [
+                const Icon(Icons.error_outline,
+                    size: 14, color: Color(0xFFC03828)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _error!,
+                    style: const TextStyle(
+                      fontFamily: 'IBMPlexMono',
+                      fontSize: 10,
+                      color: Color(0xFFC03828),
+                    ),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () => setState(() => _error = null),
+                  child: const Icon(Icons.close,
+                      size: 12, color: Color(0xFFC03828)),
+                ),
+              ],
+            ),
+          ),
+        // Use IndexedStack to keep both views alive when switching
         Expanded(
           child: _isLoading
-              ? Center(
+              ? const Center(
                   child: Text(
                     'Loading session...',
                     style: TextStyle(
@@ -136,15 +197,100 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
                     ),
                   ),
                 )
-              : _viewMode == _ViewMode.timeline
-                  ? TimelineView(events: allEvents)
-                  : TerminalView(events: allEvents),
+              : IndexedStack(
+                  index: _viewMode == _ViewMode.timeline ? 0 : 1,
+                  children: [
+                    TimelineView(
+                      events: allEvents,
+                      onPermission: _onPermission,
+                    ),
+                    PinchTerminalView(events: allEvents),
+                  ],
+                ),
         ),
         InputBar(
-          enabled: !meta.isResponding && !_isResuming,
+          enabled: canSend,
           onSubmit: _onSendPrompt,
         ),
+        _buildStatusLine(meta),
       ],
+    );
+  }
+
+  Widget _buildStatusLine(SessionMeta meta) {
+    final perm = meta.permissionMode ?? 'default';
+    final isDanger = perm.toLowerCase() == 'bypasspermissions' ||
+        perm.toLowerCase() == 'dontask';
+
+    return Container(
+      height: 24,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: isDanger ? const Color(0xFF1A0A06) : TvaColors.bgInset,
+        border: const Border(top: BorderSide(color: TvaColors.brd)),
+      ),
+      child: Row(
+        children: [
+          // Permission mode indicator
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: isDanger
+                  ? TvaColors.rust
+                  : perm == 'default'
+                      ? TvaColors.amber
+                      : TvaColors.greenBr,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            perm,
+            style: TextStyle(
+              fontFamily: 'IBMPlexMono',
+              fontSize: isDanger ? 9 : 8,
+              fontWeight: isDanger ? FontWeight.w700 : FontWeight.normal,
+              color: isDanger ? TvaColors.rust : TvaColors.txt3,
+              letterSpacing: isDanger ? 2 : 1,
+            ),
+          ),
+          const Spacer(),
+          // Effort
+          if (meta.model != null) ...[
+            const Text('\u25D0 ', style: TextStyle(fontSize: 8, color: TvaColors.txt3)),
+            Text(
+              meta.model!.replaceAll('[1m]', ''),
+              style: const TextStyle(
+                fontFamily: 'IBMPlexMono',
+                fontSize: 8,
+                color: TvaColors.txt3,
+              ),
+            ),
+          ],
+          const SizedBox(width: 16),
+          // Cost
+          if (meta.cost > 0)
+            Text(
+              '\$${meta.cost.toStringAsFixed(2)}',
+              style: const TextStyle(
+                fontFamily: 'IBMPlexMono',
+                fontSize: 8,
+                color: TvaColors.txt3,
+              ),
+            ),
+          const SizedBox(width: 16),
+          const Text(
+            'Pinch',
+            style: TextStyle(
+              fontFamily: 'IBMPlexMono',
+              fontSize: 8,
+              fontStyle: FontStyle.italic,
+              color: TvaColors.txt3,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -179,60 +325,32 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
             width: 5,
             height: 5,
             decoration: BoxDecoration(
-              color: _isResuming
-                  ? TvaColors.amber
-                  : _isLive
-                      ? TvaColors.orange
-                      : TvaColors.txt3,
+              color: meta.isEnded
+                  ? TvaColors.txt3
+                  : _isResuming
+                      ? TvaColors.amber
+                      : meta.isResponding
+                          ? TvaColors.greenBr
+                          : _isLive
+                              ? TvaColors.orange
+                              : TvaColors.txt3,
               shape: BoxShape.circle,
             ),
           ),
           const SizedBox(width: 8),
-          // Status badge
-          if (!_isLive && !_isResuming)
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  border: Border.all(color: TvaColors.txt3),
-                ),
-                child: const Text(
-                  'HISTORICAL',
-                  style: TextStyle(
-                    fontFamily: 'IBMPlexMono',
-                    fontSize: 7,
-                    color: TvaColors.txt3,
-                    letterSpacing: 1,
-                  ),
-                ),
-              ),
-            ),
+          // Status badges
+          if (meta.isEnded)
+            _statusBadge('ENDED', TvaColors.txt3),
+          if (!_isLive && !_isResuming && !meta.isEnded)
+            _statusBadge('HISTORICAL', TvaColors.txt3),
           if (_isResuming)
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  border: Border.all(color: TvaColors.amber),
-                ),
-                child: const Text(
-                  'RESUMING...',
-                  style: TextStyle(
-                    fontFamily: 'IBMPlexMono',
-                    fontSize: 7,
-                    color: TvaColors.amber,
-                    letterSpacing: 1,
-                  ),
-                ),
-              ),
-            ),
+            _statusBadge('RESUMING...', TvaColors.amber),
+          if (meta.isResponding)
+            _statusBadge('RESPONDING', TvaColors.greenBr),
           Text(
             sessionName,
             style: const TextStyle(
-              fontFamily: 'monospace',
+              fontFamily: 'IBMPlexMono',
               fontSize: 12,
               fontWeight: FontWeight.w600,
               color: TvaColors.txt,
@@ -243,7 +361,7 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
             Text(
               '$elapsed — $model',
               style: const TextStyle(
-                fontFamily: 'monospace',
+                fontFamily: 'IBMPlexMono',
                 fontSize: 9,
                 color: TvaColors.txt3,
               ),
@@ -258,13 +376,10 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
                   isActive: _viewMode == _ViewMode.terminal),
             ],
           ),
-          if (_isLive) ...[
+          if (_isLive && !meta.isEnded) ...[
             const SizedBox(width: 8),
-            // Stop button
             GestureDetector(
-              onTap: () => ref
-                  .read(connectionServiceProvider)
-                  .stopSession(widget.sessionId),
+              onTap: _stopSession,
               child: Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -274,7 +389,7 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
                 child: const Text(
                   'STOP',
                   style: TextStyle(
-                    fontFamily: 'monospace',
+                    fontFamily: 'IBMPlexMono',
                     fontSize: 9,
                     color: TvaColors.rust,
                   ),
@@ -283,6 +398,27 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _statusBadge(String text, Color color) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          border: Border.all(color: color),
+        ),
+        child: Text(
+          text,
+          style: TextStyle(
+            fontFamily: 'IBMPlexMono',
+            fontSize: 7,
+            color: color,
+            letterSpacing: 1,
+          ),
+        ),
       ),
     );
   }
@@ -306,7 +442,7 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
         child: Text(
           label,
           style: TextStyle(
-            fontFamily: 'monospace',
+            fontFamily: 'IBMPlexMono',
             fontSize: 8,
             color: isActive ? TvaColors.amber : TvaColors.txt3,
             letterSpacing: 1,

@@ -59,14 +59,14 @@ final routerProvider = Provider<GoRouter>((ref) {
               child: HistoryScreen(),
             ),
           ),
-          GoRoute(
-            path: '/settings',
-            pageBuilder: (context, state) => const NoTransitionPage(
-              key: ValueKey('settings'),
-              child: SettingsScreen(),
-            ),
-          ),
         ],
+      ),
+      GoRoute(
+        path: '/settings',
+        pageBuilder: (context, state) => const NoTransitionPage(
+          key: ValueKey('settings'),
+          child: SettingsScreen(),
+        ),
       ),
     ],
   );

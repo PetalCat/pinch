@@ -37,7 +37,7 @@ class _SessionCreateSheetState extends State<SessionCreateSheet> {
   late final TextEditingController _addDirsController;
   late final TextEditingController _mcpConfigController;
 
-  String _model = 'opus';
+  String _model = 'auto';
   String _permissionMode = 'default';
   String _effort = 'high';
   bool _dangerouslySkipPermissions = false;
@@ -236,7 +236,7 @@ class _SessionCreateSheetState extends State<SessionCreateSheet> {
     final projectDir = _projectDirController.text.trim();
     if (projectDir.isEmpty) return;
 
-    final model = _model == 'custom' ? _customModelController.text.trim() : _model;
+    final model = _model == 'custom' ? _customModelController.text.trim() : _model == 'auto' ? null : _model;
 
     final allowedTools = _allowedToolsController.text.trim().isEmpty
         ? <String>[]
@@ -267,7 +267,7 @@ class _SessionCreateSheetState extends State<SessionCreateSheet> {
 
     final options = SessionOptions(
       projectDir: projectDir,
-      model: model.isEmpty ? null : model,
+      model: (model == null || model.isEmpty) ? null : model,
       permissionMode:
           _permissionMode == 'default' ? null : _permissionMode,
       dangerouslySkipPermissions: _dangerouslySkipPermissions,
@@ -340,12 +340,13 @@ class _SessionCreateSheetState extends State<SessionCreateSheet> {
                   _buildDropdown<String>(
                     value: _model,
                     items: const [
+                      DropdownMenuItem(value: 'auto', child: Text('auto (default)')),
                       DropdownMenuItem(value: 'opus', child: Text('opus')),
                       DropdownMenuItem(value: 'sonnet', child: Text('sonnet')),
                       DropdownMenuItem(value: 'haiku', child: Text('haiku')),
                       DropdownMenuItem(value: 'custom', child: Text('custom')),
                     ],
-                    onChanged: (v) => setState(() => _model = v ?? 'opus'),
+                    onChanged: (v) => setState(() => _model = v ?? 'auto'),
                   ),
                   if (_model == 'custom') ...[
                     const SizedBox(height: 8),

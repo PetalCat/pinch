@@ -14,6 +14,7 @@ enum EventType {
   error,
   sessionStart,
   sessionEnd,
+  turnComplete,
 }
 
 @freezed

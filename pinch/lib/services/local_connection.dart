@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../models/session_event.dart';
 import '../models/session_options.dart';
@@ -16,6 +17,12 @@ class LocalConnection implements ConnectionService {
   ConnectionStatus _status = ConnectionStatus.disconnected;
   String _baseUrl = '';
   String _wsUrl = '';
+  String _host = '';
+  int _port = 0;
+  Completer<String>? _sessionIdCompleter;
+  Timer? _reconnectTimer;
+  int _reconnectAttempts = 0;
+
 
   final _eventController = StreamController<SessionEvent>.broadcast();
 
@@ -26,6 +33,8 @@ class LocalConnection implements ConnectionService {
 
   @override
   Future<void> connect(String host, int port, {String? authToken}) async {
+    _host = host;
+    _port = port;
     _baseUrl = 'http://$host:$port';
     _wsUrl = 'ws://$host:$port/ws';
     _dio = Dio(BaseOptions(
@@ -34,41 +43,68 @@ class LocalConnection implements ConnectionService {
       receiveTimeout: const Duration(seconds: 10),
     ));
 
+    await _connectWs();
+  }
+
+  Future<void> _connectWs() async {
     _status = ConnectionStatus.connecting;
     _statusController.add(_status);
 
     try {
-      // Test connection with a simple request
       await _dio.get('/api/projects');
 
-      // Connect WebSocket
       _ws = WebSocketChannel.connect(Uri.parse(_wsUrl));
       _ws!.stream.listen(
         (data) {
           try {
             final json = jsonDecode(data.toString()) as Map<String, dynamic>;
+            final type = json['type'] as String? ?? '';
+            if (type == 'sessionCreated') {
+              final sid = json['sessionId'] as String?;
+              if (sid != null) {
+                _sessionIdCompleter?.complete(sid);
+                _sessionIdCompleter = null;
+              }
+              return;
+            }
+            // Skip PTY/internal messages
+            if (type == 'ptyData' || type == 'ptyExit' || type == 'sessionReady') {
+              return;
+            }
             final event = SessionEvent.fromJson(json);
             _eventController.add(event);
-          } catch (_) {
-            // Ignore malformed messages
+          } catch (e) {
+            debugPrint('WS parse error: $e');
           }
         },
         onError: (Object e) {
           _status = ConnectionStatus.error;
           _statusController.add(_status);
+          _scheduleReconnect();
         },
         onDone: () {
           _status = ConnectionStatus.disconnected;
           _statusController.add(_status);
+          _scheduleReconnect();
         },
       );
 
       _status = ConnectionStatus.connected;
       _statusController.add(_status);
+      _reconnectAttempts = 0;
     } catch (e) {
-      _status = ConnectionStatus.error;
+      _status = ConnectionStatus.disconnected;
       _statusController.add(_status);
+      _scheduleReconnect();
     }
+  }
+
+  void _scheduleReconnect() {
+    _reconnectTimer?.cancel();
+    final delay = Duration(seconds: [1, 2, 4, 8, 15, 30][_reconnectAttempts.clamp(0, 5)]);
+    _reconnectAttempts++;
+    debugPrint('Reconnecting in ${delay.inSeconds}s (attempt $_reconnectAttempts)');
+    _reconnectTimer = Timer(delay, () => _connectWs());
   }
 
   @override
@@ -92,13 +128,7 @@ class LocalConnection implements ConnectionService {
 
   @override
   Future<String> createSession(String projectDir, {String? name}) async {
-    final sessionId = DateTime.now().millisecondsSinceEpoch.toString();
-    _ws?.sink.add(jsonEncode({
-      'action': 'createSession',
-      'projectDir': projectDir,
-      'name': name,
-    }));
-    return sessionId;
+    return createSessionWithOptions(SessionOptions(projectDir: projectDir, sessionName: name));
   }
 
   @override
@@ -108,9 +138,10 @@ class LocalConnection implements ConnectionService {
 
   @override
   Future<void> respondToPermission(String toolUseId, bool allowed,
-      {bool always = false}) async {
+      {bool always = false, String? sessionId}) async {
     _ws?.sink.add(jsonEncode({
       'action': 'permission',
+      'sessionId': sessionId,
       'toolUseId': toolUseId,
       'allowed': allowed,
       'always': always,
@@ -152,11 +183,17 @@ class LocalConnection implements ConnectionService {
 
   @override
   Future<String> createSessionWithOptions(SessionOptions options) async {
-    final sessionId = DateTime.now().millisecondsSinceEpoch.toString();
+    _sessionIdCompleter = Completer<String>();
     _ws?.sink.add(jsonEncode({
       'action': 'createSession',
       'options': options.toJson(),
     }));
+    // Wait for server to respond with the real session ID (timeout 10s)
+    final sessionId = await _sessionIdCompleter!.future
+        .timeout(const Duration(seconds: 10), onTimeout: () {
+      debugPrint('Timed out waiting for sessionCreated response');
+      return DateTime.now().millisecondsSinceEpoch.toString();
+    });
     return sessionId;
   }
 
@@ -243,4 +280,5 @@ class LocalConnection implements ConnectionService {
       return [];
     }
   }
+
 }

@@ -3,10 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../models/session.dart';
+import '../models/session_options.dart';
 import '../providers/connection_provider.dart';
 import '../providers/history_provider.dart';
 import '../providers/project_provider.dart';
 import '../providers/session_provider.dart';
+import '../providers/settings_provider.dart';
 import '../theme/tva_colors.dart';
 import '../widgets/session_create_dialog.dart';
 
@@ -28,16 +30,17 @@ class HomeScreen extends ConsumerWidget {
             // Header
             Text('PINCH', style: textTheme.headlineLarge),
             const SizedBox(height: 4),
-            Text('Remote Operations Interface', style: textTheme.bodySmall),
+            Text('Claude Code in a Pinch!', style: textTheme.bodySmall),
             const SizedBox(height: 32),
 
-            // Quick Session button
+            // Quick Session — launches immediately with settings defaults
             GestureDetector(
-              onTap: () => _createSession(context, ref),
+              onTap: () => _quickSession(context, ref),
               child: Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
+                  color: TvaColors.amber.withValues(alpha: 0.1),
                   border: Border.all(color: TvaColors.amber),
                 ),
                 child: Row(
@@ -56,6 +59,38 @@ class HomeScreen extends ConsumerWidget {
                       style: _mono.copyWith(
                         fontSize: 11,
                         color: TvaColors.amber,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            // New Session — opens the full dialog
+            GestureDetector(
+              onTap: () => _newSession(context, ref),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  border: Border.all(color: TvaColors.brd),
+                ),
+                child: Row(
+                  children: [
+                    Text(
+                      '+ NEW SESSION',
+                      style: _mono.copyWith(
+                        fontSize: 10,
+                        color: TvaColors.txt3,
+                        letterSpacing: 2,
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      '>',
+                      style: _mono.copyWith(
+                        fontSize: 10,
+                        color: TvaColors.txt3,
                       ),
                     ),
                   ],
@@ -205,13 +240,75 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _createSession(BuildContext context, WidgetRef ref) async {
-    final options = await showSessionCreateDialog(context);
-    if (options != null) {
+  Future<void> _quickSession(BuildContext context, WidgetRef ref) async {
+    final settingsAsync = ref.read(settingsProvider);
+    final settings = settingsAsync.valueOrNull;
+
+    if (settings?.defaultProjectDir == null ||
+        settings!.defaultProjectDir!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: TvaColors.bgPanel,
+          content: Text(
+            'Set a default project directory in Settings first.',
+            style: _mono.copyWith(fontSize: 11, color: TvaColors.amber),
+          ),
+        ),
+      );
+      context.go('/settings');
+      return;
+    }
+
+    final options = SessionOptions(
+      projectDir: settings.defaultProjectDir!,
+      model: settings.model,
+      permissionMode:
+          settings.permissionMode == 'default' ? null : settings.permissionMode,
+      effort: settings.effort,
+      dangerouslySkipPermissions: settings.dangerouslySkipPermissions,
+      worktree: settings.worktree,
+    );
+
+    try {
       final conn = ref.read(connectionServiceProvider);
       final sessionId = await conn.createSessionWithOptions(options);
       ref.read(activeSessionIdProvider.notifier).state = sessionId;
       if (context.mounted) context.go('/session/$sessionId');
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: TvaColors.bgPanel,
+            content: Text(
+              'Failed to create session: $e',
+              style: _mono.copyWith(fontSize: 11, color: TvaColors.rust),
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _newSession(BuildContext context, WidgetRef ref) async {
+    final options = await showSessionCreateDialog(context);
+    if (options == null) return;
+    try {
+      final conn = ref.read(connectionServiceProvider);
+      final sessionId = await conn.createSessionWithOptions(options);
+      ref.read(activeSessionIdProvider.notifier).state = sessionId;
+      if (context.mounted) context.go('/session/$sessionId');
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: TvaColors.bgPanel,
+            content: Text(
+              'Failed to create session: $e',
+              style: _mono.copyWith(fontSize: 11, color: TvaColors.rust),
+            ),
+          ),
+        );
+      }
     }
   }
 }

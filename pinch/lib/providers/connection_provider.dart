@@ -17,7 +17,7 @@ abstract class ConnectionService {
   Future<String> createSession(String projectDir, {String? name});
   Future<void> stopSession(String sessionId);
   Future<void> respondToPermission(String toolUseId, bool allowed,
-      {bool always = false});
+      {bool always = false, String? sessionId});
   Future<List<Session>> getSessions(String projectId);
   Future<List<Project>> getProjects();
   Future<List<Document>> getDocs(String projectId);

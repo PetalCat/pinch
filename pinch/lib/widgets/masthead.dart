@@ -31,12 +31,12 @@ class Masthead extends ConsumerWidget {
     final (Color statusColor, String statusText) = connStatus.when(
       data: (status) => switch (status) {
         ConnectionStatus.connected => (TvaColors.greenBr, 'CONNECTED'),
-        ConnectionStatus.connecting => (TvaColors.amber, 'CONNECTING'),
-        ConnectionStatus.error => (TvaColors.rust, 'ERROR'),
-        ConnectionStatus.disconnected => (TvaColors.txt3, 'OFFLINE'),
+        ConnectionStatus.connecting => (TvaColors.amber, 'CONNECTING...'),
+        ConnectionStatus.error => (TvaColors.rust, 'DISCONNECTED'),
+        ConnectionStatus.disconnected => (TvaColors.rust, 'DISCONNECTED'),
       },
-      loading: () => (TvaColors.amber, 'CONNECTING'),
-      error: (_, __) => (TvaColors.rust, 'ERROR'),
+      loading: () => (TvaColors.amber, 'CONNECTING...'),
+      error: (_, __) => (TvaColors.rust, 'DISCONNECTED'),
     );
 
     // Format elapsed as HH:MM:SS
@@ -72,11 +72,11 @@ class Masthead extends ConsumerWidget {
                 ),
               ),
               Text(
-                'OPS',
+                'Claude Code in a Pinch!',
                 style: mono.copyWith(
                   color: TvaColors.txt3,
                   fontSize: 8,
-                  letterSpacing: 2,
+                  letterSpacing: 1,
                 ),
               ),
             ],
@@ -140,15 +140,16 @@ class Masthead extends ConsumerWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
-                    width: 5,
-                    height: 5,
+                    width: 7,
+                    height: 7,
                     decoration: BoxDecoration(
                       color: statusColor,
-                      borderRadius: BorderRadius.circular(2.5),
+                      borderRadius: BorderRadius.circular(3.5),
                       boxShadow: [
                         BoxShadow(
                           color: statusColor.withValues(alpha: 0.6),
-                          blurRadius: 4,
+                          blurRadius: statusText == 'CONNECTED' ? 4 : 8,
+                          spreadRadius: statusText == 'CONNECTED' ? 0 : 1,
                         ),
                       ],
                     ),
@@ -159,6 +160,7 @@ class Masthead extends ConsumerWidget {
                     style: mono.copyWith(
                       color: statusColor,
                       fontSize: 10,
+                      fontWeight: statusText != 'CONNECTED' ? FontWeight.w700 : FontWeight.normal,
                       letterSpacing: 1,
                     ),
                   ),

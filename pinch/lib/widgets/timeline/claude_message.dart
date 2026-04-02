@@ -21,101 +21,55 @@ class ClaudeMessage extends StatefulWidget {
 }
 
 class _ClaudeMessageState extends State<ClaudeMessage> {
-  bool _wasActive = false;
-  bool _isWalking = false;
-  ClawdState _walkState = ClawdState.idle;
-
-  @override
-  void didUpdateWidget(ClaudeMessage oldWidget) {
-    super.didUpdateWidget(oldWidget);
-
-    if (!oldWidget.isLatest && widget.isLatest) {
-      // Becoming the active message: walk on
-      setState(() {
-        _isWalking = true;
-        _walkState = ClawdState.walkingOn;
-        _wasActive = true;
-      });
-    } else if (oldWidget.isLatest && !widget.isLatest && _wasActive) {
-      // Losing active status: walk off
-      setState(() {
-        _isWalking = true;
-        _walkState = ClawdState.walkingOff;
-      });
-    }
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.isLatest) {
-      _wasActive = true;
-    }
-  }
-
-  void _onWalkComplete() {
-    if (!mounted) return;
-    setState(() {
-      _isWalking = false;
-      if (_walkState == ClawdState.walkingOff) {
-        _wasActive = false;
-      }
-      _walkState = ClawdState.idle;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
-    final showClawd = widget.isLatest || _isWalking;
-
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(bottom: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          AnimatedSize(
-            duration: const Duration(milliseconds: 600),
-            curve: Curves.easeOut,
-            child: showClawd
-                ? SizedBox(
-                    width: 100,
-                    height: 44,
-                    child: _isWalking
-                        ? ClawdAnimator(
-                            state: _walkState,
-                            cellWidth: 2.67,
-                            cellHeight: 5.87,
-                            onWalkComplete: _onWalkComplete,
-                          )
-                        : Consumer(
-                            builder: (context, ref, _) {
-                              final clawdState =
-                                  ref.watch(clawdStateProvider);
-                              return ClawdAnimator(
-                                state: clawdState,
-                                cellWidth: 2.67,
-                                cellHeight: 5.87,
-                              );
-                            },
-                          ),
-                  )
-                : const SizedBox.shrink(),
+          // Clawd sprite + label
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              if (widget.isLatest)
+                Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: Consumer(
+                      builder: (context, ref, _) {
+                        final clawdState = ref.watch(clawdStateProvider);
+                        return ClawdAnimator(
+                          state: clawdState,
+                          cellWidth: 1.4,
+                          cellHeight: 3.0,
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              const Text(
+                'CLAUDE',
+                style: TextStyle(
+                  fontFamily: 'IBMPlexMono',
+                  fontSize: 9,
+                  color: TvaColors.amberDm,
+                  letterSpacing: 3,
+                ),
+              ),
+            ],
           ),
-          const Text(
-            'CLAUDE',
-            style: TextStyle(
-              fontFamily: 'monospace',
-              fontSize: 9,
-              color: TvaColors.amberDm,
-              letterSpacing: 3,
-            ),
-          ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 3),
+          // Response text
           Text(
             widget.text,
             style: const TextStyle(
+              fontFamily: 'IBMPlexSans',
               fontSize: 13,
-              color: Color(0xBFC8B99A),
+              color: Color(0xBFC8B99A), // beige with opacity
+              height: 1.55,
             ),
           ),
         ],

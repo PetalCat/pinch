@@ -35,4 +35,5 @@ const _$EventTypeEnumMap = {
   EventType.error: 'error',
   EventType.sessionStart: 'sessionStart',
   EventType.sessionEnd: 'sessionEnd',
+  EventType.turnComplete: 'turnComplete',
 };
