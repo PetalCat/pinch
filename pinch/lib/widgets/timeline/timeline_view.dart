@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/session_event.dart';
 import '../../theme/tva_colors.dart';
 import 'claude_message.dart';
+import 'clawd_walk_controller.dart';
 import 'diff_block.dart';
 import 'permission_bar.dart';
 import 'result_block.dart';
@@ -26,6 +27,7 @@ class TimelineView extends StatefulWidget {
 
 class _TimelineViewState extends State<TimelineView> {
   final ScrollController _scrollController = ScrollController();
+  final ClawdWalkController _walkController = ClawdWalkController();
   int _prevEventCount = 0;
 
   int get _lastClaudeIndex {
@@ -43,6 +45,17 @@ class _TimelineViewState extends State<TimelineView> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final idx = _lastClaudeIndex;
+      if (idx >= 0) {
+        _walkController.setActiveMessage(idx);
+      }
+    });
+  }
+
+  @override
   void didUpdateWidget(TimelineView oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.events.length > _prevEventCount) {
@@ -57,10 +70,16 @@ class _TimelineViewState extends State<TimelineView> {
         }
       });
     }
+
+    final idx = _lastClaudeIndex;
+    if (idx >= 0) {
+      _walkController.setActiveMessage(idx);
+    }
   }
 
   @override
   void dispose() {
+    _walkController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -99,7 +118,8 @@ class _TimelineViewState extends State<TimelineView> {
       EventType.userMessage => _UserBlock(text: event.data['text'] as String? ?? ''),
       EventType.assistantText => ClaudeMessage(
           text: event.data['text'] as String? ?? '',
-          isLatest: index == _lastClaudeIndex,
+          walkController: _walkController,
+          messageIndex: index,
         ),
       EventType.assistantThinking => ThinkingBlock(
           text: event.data['thinking'] as String? ?? '',
