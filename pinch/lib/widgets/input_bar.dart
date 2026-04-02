@@ -15,6 +15,8 @@ class InputBar extends StatefulWidget {
 class _InputBarState extends State<InputBar>
     with SingleTickerProviderStateMixin {
   final _controller = TextEditingController();
+  final _focusNode = FocusNode();
+  bool _hasFocus = false;
   late final AnimationController _chevronController;
 
   static const _monoStyle = TextStyle(
@@ -29,11 +31,14 @@ class _InputBarState extends State<InputBar>
     super.initState();
     _chevronController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 1),
+      duration: const Duration(milliseconds: 1200),
     );
     if (widget.enabled) {
       _chevronController.repeat();
     }
+    _focusNode.addListener(() {
+      setState(() => _hasFocus = _focusNode.hasFocus);
+    });
   }
 
   @override
@@ -51,6 +56,7 @@ class _InputBarState extends State<InputBar>
   @override
   void dispose() {
     _controller.dispose();
+    _focusNode.dispose();
     _chevronController.dispose();
     super.dispose();
   }
@@ -74,17 +80,18 @@ class _InputBarState extends State<InputBar>
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: TvaColors.bgInset,
-          border: Border.all(color: TvaColors.brd),
+          border: Border.all(color: _hasFocus ? TvaColors.amberDm : TvaColors.brd),
         ),
         child: Row(
           children: [
             AnimatedBuilder(
               animation: _chevronController,
               builder: (context, _) {
-                final visible = !widget.enabled ||
-                    _chevronController.value < 0.5;
+                final v = _chevronController.value;
+                // Mockup: 0-30% → 1.0, 30-60% → 0.3, 60-90% → 1.0, 90-100% → 0.3
+                final opacity = (v < 0.3 || (v >= 0.6 && v < 0.9)) ? 1.0 : 0.3;
                 return Opacity(
-                  opacity: visible ? 1.0 : 0.0,
+                  opacity: widget.enabled ? opacity : 0.5,
                   child: const Text(
                     '>',
                     style: TextStyle(
@@ -101,6 +108,7 @@ class _InputBarState extends State<InputBar>
             Expanded(
               child: TextField(
                 controller: _controller,
+                focusNode: _focusNode,
                 enabled: widget.enabled,
                 style: _monoStyle,
                 decoration: const InputDecoration.collapsed(
