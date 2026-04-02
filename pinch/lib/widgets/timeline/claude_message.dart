@@ -26,6 +26,7 @@ class ClaudeMessage extends StatefulWidget {
 class _ClaudeMessageState extends State<ClaudeMessage>
     with SingleTickerProviderStateMixin {
   late AnimationController _collapseController;
+  late Animation<double> _collapseAnimation;
   bool _wasActive = false;
 
   @override
@@ -34,6 +35,10 @@ class _ClaudeMessageState extends State<ClaudeMessage>
     _collapseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 600),
+    );
+    _collapseAnimation = CurvedAnimation(
+      parent: _collapseController,
+      curve: Curves.easeOut,
     );
     widget.walkController.addListener(_onWalkChanged);
   }
@@ -114,11 +119,11 @@ class _ClaudeMessageState extends State<ClaudeMessage>
   Widget _buildClawdArea(ClawdVisibility vis) {
     if (vis == ClawdVisibility.hidden && _wasActive) {
       return AnimatedBuilder(
-        animation: _collapseController,
+        animation: _collapseAnimation,
         builder: (context, child) {
           return SizedBox(
-            height: (1.0 - _collapseController.value) * 44,
-            width: (1.0 - _collapseController.value) * 100,
+            height: (1.0 - _collapseAnimation.value) * 44,
+            width: (1.0 - _collapseAnimation.value) * 100,
           );
         },
       );
