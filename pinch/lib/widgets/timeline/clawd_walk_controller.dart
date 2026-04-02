@@ -19,6 +19,7 @@ class ClawdWalkController extends ChangeNotifier {
 
   int? get activeIndex => _activeIndex;
   int? get departingIndex => _departingIndex;
+  bool get isTransitioning => _isTransitioning;
 
   ClawdVisibility visibilityFor(int index) {
     if (index == _departingIndex) return ClawdVisibility.departing;

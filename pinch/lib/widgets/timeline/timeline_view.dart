@@ -71,9 +71,12 @@ class _TimelineViewState extends State<TimelineView> {
       });
     }
 
-    final idx = _lastClaudeIndex;
-    if (idx >= 0) {
-      _walkController.setActiveMessage(idx);
+    // Only trigger walk transition when latest Claude index actually changes
+    if (widget.events.length != oldWidget.events.length) {
+      final idx = _lastClaudeIndex;
+      if (idx >= 0) {
+        _walkController.setActiveMessage(idx);
+      }
     }
   }
 
