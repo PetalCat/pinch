@@ -45,7 +45,7 @@ class ToolRow extends StatelessWidget {
             toolName.toUpperCase(),
             style: TextStyle(
               fontFamily: 'IBMPlexMono',
-              fontSize: 9,
+              fontSize: 10,
               fontWeight: FontWeight.w500,
               color: color,
               letterSpacing: 1.5,
@@ -57,17 +57,17 @@ class ToolRow extends StatelessWidget {
               target,
               style: const TextStyle(
                 fontFamily: 'IBMPlexMono',
-                fontSize: 10,
+                fontSize: 11,
                 color: TvaColors.txt2,
               ),
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          Text(
+          const Text(
             '>',
             style: TextStyle(
               fontFamily: 'IBMPlexMono',
-              fontSize: 9,
+              fontSize: 10,
               color: TvaColors.txt3,
             ),
           ),

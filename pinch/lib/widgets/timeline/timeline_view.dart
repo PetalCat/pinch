@@ -304,19 +304,19 @@ class _UserBlock extends StatelessWidget {
             'YOU',
             style: TextStyle(
               fontFamily: 'IBMPlexMono',
-              fontSize: 9,
+              fontSize: 10,
               color: TvaColors.txt3,
               letterSpacing: 3,
             ),
           ),
-          const SizedBox(height: 3),
+          const SizedBox(height: 4),
           Text(
             text,
             style: const TextStyle(
               fontFamily: 'IBMPlexSans',
-              fontSize: 13,
+              fontSize: 14,
               color: TvaColors.txt,
-              height: 1.55,
+              height: 1.5,
             ),
           ),
         ],
