@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../models/session.dart';
 import '../providers/active_session_provider.dart';
 import '../providers/clawd_state_provider.dart';
+import 'clawd/clawd_state.dart';
 import '../providers/connection_provider.dart';
 import '../providers/history_provider.dart';
 import '../providers/session_provider.dart';
@@ -118,7 +119,41 @@ class _SidebarState extends ConsumerState<Sidebar>
       final sessionMeta = ref.watch(sessionMetaProvider);
       final elapsed = sessionMeta.elapsed.inMinutes;
       final clawdState = ref.watch(clawdStateProvider);
-      meta = '${elapsed}m — ${clawdState.name}';
+
+      // Override dot color/pulse based on Clawd state for the active session
+      switch (clawdState) {
+        case ClawdState.error:
+          dotColor = TvaColors.rust;
+          pulsing = false;
+        case ClawdState.success:
+          dotColor = TvaColors.greenBr;
+          pulsing = false;
+        case ClawdState.reading:
+        case ClawdState.editing:
+        case ClawdState.bash:
+        case ClawdState.typing:
+          dotColor = TvaColors.orange;
+          pulsing = true;
+        default:
+          // idle, thinking, walkingOff, walkingOn, hidden
+          dotColor = TvaColors.amber;
+          pulsing = false;
+      }
+
+      // Map ClawdState to human-readable label
+      final String stateLabel = switch (clawdState) {
+        ClawdState.idle => 'idle',
+        ClawdState.thinking => 'thinking',
+        ClawdState.reading => 'reading files',
+        ClawdState.editing => 'writing code',
+        ClawdState.bash => 'running command',
+        ClawdState.typing => 'generating',
+        ClawdState.error => 'error',
+        ClawdState.success => 'done',
+        _ => clawdState.name,
+      };
+
+      meta = '${elapsed}m — $stateLabel';
     } else {
       meta = session.status.name;
     }
