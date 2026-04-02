@@ -9,6 +9,7 @@ import 'masthead.dart';
 import 'panel_corners.dart';
 import 'rail.dart';
 import 'sidebar.dart';
+import 'ticker_bar.dart';
 
 class AppShell extends ConsumerWidget {
   final Widget child;
@@ -21,44 +22,65 @@ class AppShell extends ConsumerWidget {
     if (isDesktop) {
       return Scaffold(
         backgroundColor: TvaColors.bg,
-        body: PanelCorners(
-          child: Container(
-            decoration: BoxDecoration(
-              color: TvaColors.bgPanel,
-              border: Border.all(color: TvaColors.brd),
-              boxShadow: const [
-                BoxShadow(
-                  offset: Offset(4, 4),
-                  blurRadius: 16,
-                  color: Color(0xCC000000),
+        body: Stack(
+          children: [
+            PanelCorners(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: TvaColors.bgPanel,
+                  border: Border.all(color: TvaColors.brd),
+                  boxShadow: const [
+                    BoxShadow(
+                      offset: Offset(4, 4),
+                      blurRadius: 16,
+                      color: Color(0xCC000000),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            child: Column(
-              children: [
-                const Masthead(),
-                Container(height: 1, color: TvaColors.brd),
-                // Ticker
-                Consumer(builder: (context, ref, _) {
-                  final meta = ref.watch(sessionMetaProvider);
-                  return _SessionInfoBar(meta: meta);
-                }),
-                Container(height: 1, color: TvaColors.brd),
-                // Main body
-                Expanded(
-                  child: Row(
-                    children: [
-                      const Rail(),
-                      Container(width: 1, color: TvaColors.brd),
-                      const Sidebar(),
-                      Container(width: 1, color: TvaColors.brd),
-                      Expanded(child: child),
-                    ],
-                  ),
+                child: Column(
+                  children: [
+                    const Masthead(),
+                    Container(height: 1, color: TvaColors.brd),
+                    Consumer(builder: (context, ref, _) {
+                      final meta = ref.watch(sessionMetaProvider);
+                      final model =
+                          meta.model?.replaceAll('[1m]', '') ?? 'OPUS 4.6';
+                      final perm = meta.permissionMode ?? 'DEFAULT';
+                      return TickerBar(
+                        text:
+                            'SESSION ACTIVE -- MODEL: ${model.toUpperCase()} -- CLAWD STATUS: NOMINAL -- PERMISSION MODE: ${perm.toUpperCase()}',
+                      );
+                    }),
+                    Container(height: 1, color: TvaColors.brd),
+                    // Session info bar
+                    Consumer(builder: (context, ref, _) {
+                      final meta = ref.watch(sessionMetaProvider);
+                      return _SessionInfoBar(meta: meta);
+                    }),
+                    Container(height: 1, color: TvaColors.brd),
+                    // Main body
+                    Expanded(
+                      child: Row(
+                        children: [
+                          const Rail(),
+                          Container(width: 1, color: TvaColors.brd),
+                          const Sidebar(),
+                          Container(width: 1, color: TvaColors.brd),
+                          Expanded(child: child),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
-          ),
+            // CRT overlay on top of everything
+            const Positioned.fill(
+              child: IgnorePointer(
+                child: _CrtOverlay(),
+              ),
+            ),
+          ],
         ),
       );
     }
@@ -125,6 +147,31 @@ class AppShell extends ConsumerWidget {
         GoRouter.of(context).go('/settings');
     }
   }
+}
+
+class _CrtOverlay extends StatelessWidget {
+  const _CrtOverlay();
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _CrtPainter(),
+      child: const SizedBox.expand(),
+    );
+  }
+}
+
+class _CrtPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = const Color(0x0D000000);
+    for (double y = 2; y < size.height; y += 4) {
+      canvas.drawRect(Rect.fromLTWH(0, y, size.width, 2), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _SessionInfoBar extends StatelessWidget {
