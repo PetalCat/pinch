@@ -98,10 +98,9 @@ class Masthead extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(width: 6),
-                  Text(
-                    _formatWithCommas(meta.tokens),
-                    key: const Key('masthead_token_count'),
-                    style: mono.copyWith(
+                  _FlashText(
+                    text: _formatWithCommas(meta.tokens),
+                    baseStyle: mono.copyWith(
                       color: TvaColors.txt2,
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
@@ -124,9 +123,9 @@ class Masthead extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(width: 6),
-                  Text(
-                    '\$${meta.cost.toStringAsFixed(2)}',
-                    style: mono.copyWith(
+                  _FlashText(
+                    text: '\$${meta.cost.toStringAsFixed(2)}',
+                    baseStyle: mono.copyWith(
                       color: TvaColors.txt2,
                       fontSize: 10,
                       letterSpacing: 1,
@@ -180,6 +179,68 @@ class Masthead extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _FlashText extends StatefulWidget {
+  final String text;
+  final TextStyle baseStyle;
+  final Color flashColor;
+
+  const _FlashText({
+    required this.text,
+    required this.baseStyle,
+    this.flashColor = TvaColors.amber, // ignore: unused_element_parameter
+  });
+
+  @override
+  State<_FlashText> createState() => _FlashTextState();
+}
+
+class _FlashTextState extends State<_FlashText>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  String _prevText = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    _prevText = widget.text;
+  }
+
+  @override
+  void didUpdateWidget(_FlashText old) {
+    super.didUpdateWidget(old);
+    if (widget.text != _prevText) {
+      _prevText = widget.text;
+      _controller.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        final isFlashing = _controller.isAnimating;
+        return Text(
+          widget.text,
+          style: widget.baseStyle.copyWith(
+            color: isFlashing ? widget.flashColor : widget.baseStyle.color,
+          ),
+        );
+      },
     );
   }
 }
