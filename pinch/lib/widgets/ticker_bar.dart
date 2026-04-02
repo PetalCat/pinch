@@ -35,7 +35,6 @@ class _TickerBarState extends State<TickerBar>
       height: 24,
       color: TvaColors.bgInset,
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      clipBehavior: Clip.hardEdge,
       child: Row(
         children: [
           Text(
