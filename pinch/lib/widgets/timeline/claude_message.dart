@@ -91,7 +91,6 @@ class _ClaudeMessageState extends State<ClaudeMessage>
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Clawd sprite + CLAUDE label in a tight group
           if (showClawd || _wasActive) _buildClawdArea(vis),
           const Text(
             'CLAUDE',
@@ -103,13 +102,13 @@ class _ClaudeMessageState extends State<ClaudeMessage>
             ),
           ),
           const SizedBox(height: 2),
-          // Message text
           Text(
-            widget.text,
+            widget.text.trim(),
             style: const TextStyle(
               fontFamily: 'IBMPlexSans',
               fontSize: 14,
               color: Color(0xBFC8B99A),
+              height: 1.45,
             ),
           ),
         ],
