@@ -267,8 +267,11 @@ class _ClawdAnimatorState extends State<ClawdAnimator>
       );
     }
 
+    // Width: sprite + space for props + walk offset
+    final spriteWidth = widget.cellWidth * 18;
+    final extraWidth = spriteWidth * 2; // room for props and walk animation
     return SizedBox(
-      width: 100,
+      width: spriteWidth + extraWidth,
       height: widget.cellHeight * 5,
       child: ListenableBuilder(
         listenable: Listenable.merge([
