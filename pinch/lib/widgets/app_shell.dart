@@ -6,6 +6,7 @@ import '../providers/active_session_provider.dart';
 import '../providers/clawd_state_provider.dart';
 import '../theme/tva_colors.dart';
 import 'masthead.dart';
+import 'panel_corners.dart';
 import 'rail.dart';
 import 'sidebar.dart';
 
@@ -20,29 +21,44 @@ class AppShell extends ConsumerWidget {
     if (isDesktop) {
       return Scaffold(
         backgroundColor: TvaColors.bg,
-        body: Column(
-          children: [
-            const Masthead(),
-            Container(height: 1, color: TvaColors.brd),
-            // Ticker
-            Consumer(builder: (context, ref, _) {
-              final meta = ref.watch(sessionMetaProvider);
-              return _SessionInfoBar(meta: meta);
-            }),
-            Container(height: 1, color: TvaColors.brd),
-            // Main body
-            Expanded(
-              child: Row(
-                children: [
-                  const Rail(),
-                  Container(width: 1, color: TvaColors.brd),
-                  const Sidebar(),
-                  Container(width: 1, color: TvaColors.brd),
-                  Expanded(child: child),
-                ],
-              ),
+        body: PanelCorners(
+          child: Container(
+            decoration: BoxDecoration(
+              color: TvaColors.bgPanel,
+              border: Border.all(color: TvaColors.brd),
+              boxShadow: const [
+                BoxShadow(
+                  offset: Offset(4, 4),
+                  blurRadius: 16,
+                  color: Color(0xCC000000),
+                ),
+              ],
             ),
-          ],
+            child: Column(
+              children: [
+                const Masthead(),
+                Container(height: 1, color: TvaColors.brd),
+                // Ticker
+                Consumer(builder: (context, ref, _) {
+                  final meta = ref.watch(sessionMetaProvider);
+                  return _SessionInfoBar(meta: meta);
+                }),
+                Container(height: 1, color: TvaColors.brd),
+                // Main body
+                Expanded(
+                  child: Row(
+                    children: [
+                      const Rail(),
+                      Container(width: 1, color: TvaColors.brd),
+                      const Sidebar(),
+                      Container(width: 1, color: TvaColors.brd),
+                      Expanded(child: child),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       );
     }
