@@ -91,13 +91,13 @@ class _ThinkingBlockState extends State<ThinkingBlock>
                 child: Row(
                   children: [
                     const Icon(Icons.psychology_outlined,
-                        size: 12, color: Color(0xFF8855CC)),
+                        size: 14, color: Color(0xFF8855CC)),
                     const SizedBox(width: 6),
                     Text(
                       _collapsed ? 'Thinking' : 'Thinking...',
                       style: const TextStyle(
                         fontFamily: 'IBMPlexMono',
-                        fontSize: 9,
+                        fontSize: 10,
                         color: Color(0xFF8855CC),
                         letterSpacing: 1,
                       ),
@@ -109,7 +109,7 @@ class _ThinkingBlockState extends State<ThinkingBlock>
                           preview,
                           style: const TextStyle(
                             fontFamily: 'IBMPlexMono',
-                            fontSize: 8,
+                            fontSize: 9,
                             color: Color(0x888855CC),
                           ),
                           maxLines: 1,
@@ -148,7 +148,7 @@ class _ThinkingBlockState extends State<ThinkingBlock>
                   widget.text,
                   style: const TextStyle(
                     fontFamily: 'IBMPlexMono',
-                    fontSize: 10,
+                    fontSize: 11,
                     color: Color(0xAA8855CC),
                     height: 1.6,
                   ),
