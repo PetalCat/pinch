@@ -4,6 +4,7 @@ import '../../theme/tva_colors.dart';
 import 'clawd_props.dart';
 import 'clawd_sprite.dart';
 import 'clawd_state.dart';
+import 'typing_indicator.dart';
 
 class ClawdAnimator extends StatefulWidget {
   final ClawdState state;
@@ -250,6 +251,8 @@ class _ClawdAnimatorState extends State<ClawdAnimator>
         return const EditProp();
       case ClawdState.bash:
         return const BashProp();
+      case ClawdState.typing:
+        return const TypingIndicator();
       default:
         return null;
     }
