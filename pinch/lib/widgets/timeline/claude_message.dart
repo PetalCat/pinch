@@ -116,32 +116,35 @@ class _ClaudeMessageState extends State<ClaudeMessage>
     );
   }
 
+  // Sprite height: 5 rows * 3.0 cell height = 15px
+  static const _clawdH = 15.0;
+
   Widget _buildClawdArea(ClawdVisibility vis) {
     if (vis == ClawdVisibility.hidden && _wasActive) {
       return AnimatedBuilder(
         animation: _collapseAnimation,
         builder: (context, child) {
-          return SizedBox(
-            height: (1.0 - _collapseAnimation.value) * 44,
-            width: (1.0 - _collapseAnimation.value) * 100,
-          );
+          final t = 1.0 - _collapseAnimation.value;
+          return SizedBox(height: t * (_clawdH + 4));
         },
       );
     }
 
-    return SizedBox(
-      width: 100,
-      height: 44,
-      child: Consumer(
-        builder: (context, ref, _) {
-          final providerState = ref.watch(clawdStateProvider);
-          final clawdState = _mapVisToClawdState(vis, providerState);
-          return ClawdAnimator(
-            state: clawdState,
-            cellWidth: 1.4,
-            cellHeight: 3.0,
-          );
-        },
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2),
+      child: SizedBox(
+        height: _clawdH,
+        child: Consumer(
+          builder: (context, ref, _) {
+            final providerState = ref.watch(clawdStateProvider);
+            final clawdState = _mapVisToClawdState(vis, providerState);
+            return ClawdAnimator(
+              state: clawdState,
+              cellWidth: 1.4,
+              cellHeight: 3.0,
+            );
+          },
+        ),
       ),
     );
   }
