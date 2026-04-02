@@ -89,9 +89,10 @@ class _ClaudeMessageState extends State<ClaudeMessage>
       padding: const EdgeInsets.only(bottom: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          if (showClawd || _wasActive)
-            _buildClawdArea(vis),
+          // Clawd sprite + CLAUDE label in a tight group
+          if (showClawd || _wasActive) _buildClawdArea(vis),
           const Text(
             'CLAUDE',
             style: TextStyle(
@@ -102,13 +103,13 @@ class _ClaudeMessageState extends State<ClaudeMessage>
             ),
           ),
           const SizedBox(height: 2),
+          // Message text
           Text(
             widget.text,
             style: const TextStyle(
               fontFamily: 'IBMPlexSans',
               fontSize: 14,
               color: Color(0xBFC8B99A),
-              height: 1.45,
             ),
           ),
         ],
