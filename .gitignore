@@ -6,3 +6,4 @@ dist/
 # Claude workflow artifacts (local-only working notes)
 PINCH_CONTEXT.md
 docs/superpowers/
+CLAUDE.md
