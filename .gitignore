@@ -1,0 +1,8 @@
+.DS_Store
+node_modules/
+dist/
+.superpowers/
+
+# Claude workflow artifacts (local-only working notes)
+PINCH_CONTEXT.md
+docs/superpowers/
