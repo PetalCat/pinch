@@ -30,6 +30,12 @@ abstract class ConnectionService {
   Future<List<Project>> getMyProjects();
   Future<void> setActiveProject(String directory);
   Stream<SessionEvent> get eventStream;
+
+  // PTY session support (real Claude Code terminal)
+  Stream<Map<String, dynamic>> get ptyStream;
+  Future<String> createPtySession(String projectDir, {int cols = 120, int rows = 40, String? model, bool dangerouslySkipPermissions = false});
+  void sendPtyInput(String sessionId, String data);
+  void sendPtyResize(String sessionId, int cols, int rows);
 }
 
 final connectionServiceProvider = Provider<ConnectionService>((ref) {
