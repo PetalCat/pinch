@@ -20,11 +20,12 @@ class LocalConnection implements ConnectionService {
   String _host = '';
   int _port = 0;
   Completer<String>? _sessionIdCompleter;
+  Completer<String>? _ptySessionIdCompleter;
   Timer? _reconnectTimer;
   int _reconnectAttempts = 0;
 
-
   final _eventController = StreamController<SessionEvent>.broadcast();
+  final _ptyController = StreamController<Map<String, dynamic>>.broadcast();
 
   @override
   Stream<ConnectionStatus> get statusStream => _statusController.stream;
@@ -67,8 +68,18 @@ class LocalConnection implements ConnectionService {
               }
               return;
             }
-            // Skip PTY/internal messages
-            if (type == 'ptyData' || type == 'ptyExit' || type == 'sessionReady') {
+            if (type == 'sessionReady') return;
+            // Route PTY messages to PTY stream
+            if (type == 'ptyData' || type == 'ptyExit') {
+              _ptyController.add(json);
+              return;
+            }
+            if (type == 'ptySessionCreated') {
+              final sid = json['sessionId'] as String?;
+              if (sid != null) {
+                _ptySessionIdCompleter?.complete(sid);
+                _ptySessionIdCompleter = null;
+              }
               return;
             }
             final event = SessionEvent.fromJson(json);
@@ -134,6 +145,57 @@ class LocalConnection implements ConnectionService {
   @override
   Future<void> stopSession(String sessionId) async {
     _ws?.sink.add(jsonEncode({'action': 'stop', 'sessionId': sessionId}));
+  }
+
+  @override
+  Stream<Map<String, dynamic>> get ptyStream => _ptyController.stream;
+
+  @override
+  Future<String> createPtySession(
+    String projectDir, {
+    int cols = 120,
+    int rows = 40,
+    String? model,
+    bool dangerouslySkipPermissions = false,
+  }) async {
+    _ptySessionIdCompleter = Completer<String>();
+    _ws?.sink.add(jsonEncode({
+      'action': 'createPtySession',
+      'options': {
+        'projectDir': projectDir,
+        'cols': cols,
+        'rows': rows,
+        if (model != null && model != 'auto') 'model': model,
+        if (dangerouslySkipPermissions) 'dangerouslySkipPermissions': true,
+      },
+    }));
+    return _ptySessionIdCompleter!.future.timeout(
+      const Duration(seconds: 10),
+      onTimeout: () {
+        debugPrint('Timed out waiting for ptySessionCreated');
+        return DateTime.now().millisecondsSinceEpoch.toString();
+      },
+    );
+  }
+
+  @override
+  void sendPtyInput(String sessionId, String data) {
+    _ws?.sink.add(jsonEncode({
+      'action': 'ptyInput',
+      'sessionId': sessionId,
+      'data': data,
+      'encoding': 'utf8',
+    }));
+  }
+
+  @override
+  void sendPtyResize(String sessionId, int cols, int rows) {
+    _ws?.sink.add(jsonEncode({
+      'action': 'ptyResize',
+      'sessionId': sessionId,
+      'cols': cols,
+      'rows': rows,
+    }));
   }
 
   @override

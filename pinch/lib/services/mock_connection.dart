@@ -166,4 +166,18 @@ class MockConnectionService implements ConnectionService {
   @override
   Future<List<SessionEvent>> getHistoricalSession(String sessionId) async => [];
 
+  @override
+  Stream<Map<String, dynamic>> get ptyStream => const Stream.empty();
+
+  @override
+  Future<String> createPtySession(String projectDir,
+      {int cols = 120, int rows = 40, String? model, bool dangerouslySkipPermissions = false}) async =>
+      'mock-pty-${DateTime.now().millisecondsSinceEpoch}';
+
+  @override
+  void sendPtyInput(String sessionId, String data) {}
+
+  @override
+  void sendPtyResize(String sessionId, int cols, int rows) {}
+
 }
