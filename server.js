@@ -1156,16 +1156,18 @@ wss.on('connection', (ws) => {
           break;
         }
         case 'ptyInput': {
-          const s = sessions.get(msg.sessionId);
+          const s = ptySessions.get(msg.sessionId);
           if (s && s.proc && s.status === 'active') {
-            s.proc.stdin.write(msg.data);
+            const buf = msg.encoding === 'base64'
+              ? Buffer.from(msg.data, 'base64')
+              : Buffer.from(msg.data, 'utf8');
+            s.proc.stdin.write(buf);
           }
           break;
         }
         case 'ptyResize': {
-          const s = sessions.get(msg.sessionId);
+          const s = ptySessions.get(msg.sessionId);
           if (s && s.proc && s.status === 'active') {
-            // Send resize command to pty-proxy
             s.proc.stdin.write(`RESIZE ${msg.cols} ${msg.rows}\n`);
           }
           break;
@@ -1174,7 +1176,7 @@ wss.on('connection', (ws) => {
           stopSession(msg.sessionId);
           // Also stop PTY sessions
           const ptyS = ptySessions.get(msg.sessionId);
-          if (ptyS && ptyS.term) { ptyS.term.kill(); }
+          if (ptyS && ptyS.proc) { ptyS.proc.kill('SIGTERM'); }
           break;
         case 'permission': {
           const s = sessions.get(msg.sessionId);
