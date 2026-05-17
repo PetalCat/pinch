@@ -45,6 +45,9 @@ abstract class ConnectionService {
   Future<void> stopAgent(String agentId);
   Future<void> deleteAgent(String agentId);
   Future<Map<String, dynamic>> provisionAgent(String agentId);
+
+  // Node fleet
+  Future<List<Map<String, dynamic>>> getNodes();
 }
 
 final connectionServiceProvider = Provider<ConnectionService>((ref) {

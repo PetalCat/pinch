@@ -384,4 +384,14 @@ class LocalConnection implements ConnectionService {
     return resp.data as Map<String, dynamic>;
   }
 
+  @override
+  Future<List<Map<String, dynamic>>> getNodes() async {
+    try {
+      final resp = await _dio.get('/api/nodes');
+      return (resp.data as List).cast<Map<String, dynamic>>();
+    } catch (_) {
+      return [];
+    }
+  }
+
 }
