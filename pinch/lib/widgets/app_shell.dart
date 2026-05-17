@@ -92,12 +92,15 @@ class AppShell extends ConsumerWidget {
         width: 260,
         child: SafeArea(child: Sidebar()),
       ),
-      body: Column(
-        children: [
-          const Masthead(),
-          Container(height: 1, color: TvaColors.brd),
-          Expanded(child: child),
-        ],
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            const Masthead(),
+            Container(height: 1, color: TvaColors.brd),
+            Expanded(child: child),
+          ],
+        ),
       ),
       bottomNavigationBar: BottomNavigationBar(
         backgroundColor: TvaColors.bgInset,

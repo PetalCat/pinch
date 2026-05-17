@@ -95,7 +95,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     return Scaffold(
       backgroundColor: TvaColors.bg,
-      body: settingsAsync.when(
+      body: SafeArea(
+        bottom: false,
+        child: settingsAsync.when(
         loading: () => const Center(
           child: Text('LOADING...', style: TextStyle(color: TvaColors.txt3)),
         ),
@@ -400,6 +402,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ],
           );
         },
+        ),
       ),
     );
   }
