@@ -17,6 +17,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   late TextEditingController _projectDirController;
   late TextEditingController _systemPromptController;
   late TextEditingController _serverHostController;
+  late TextEditingController _serverTokenController;
   String _model = 'auto';
   String _permissionMode = 'default';
   String _effort = 'high';
@@ -40,6 +41,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _projectDirController = TextEditingController();
     _systemPromptController = TextEditingController();
     _serverHostController = TextEditingController();
+    _serverTokenController = TextEditingController();
   }
 
   @override
@@ -47,12 +49,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _projectDirController.dispose();
     _systemPromptController.dispose();
     _serverHostController.dispose();
+    _serverTokenController.dispose();
     super.dispose();
   }
 
   void _loadFrom(UserSettings s) {
     _projectDirController.text = s.defaultProjectDir ?? '';
     _serverHostController.text = s.serverHost;
+    _serverTokenController.text = s.serverToken;
     _model = s.model;
     _permissionMode = s.permissionMode;
     _effort = s.effort;
@@ -79,6 +83,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       serverHost: _serverHostController.text.trim().isEmpty
           ? 'localhost'
           : _serverHostController.text.trim(),
+      serverToken: _serverTokenController.text.trim(),
     );
     await ref.read(settingsProvider.notifier).save(settings);
     setState(() => _dirty = false);
@@ -206,11 +211,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             _label('SERVER HOST'),
                             _textField(
                               _serverHostController,
-                              hint: 'localhost',
+                              hint: 'pinch.example.com',
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Hostname or IP of the Pinch gateway.',
+                              'Hostname of the Pinch gateway. Use a public domain for remote access.',
+                              style:
+                                  _mono.copyWith(fontSize: 8, color: TvaColors.txt3),
+                            ),
+                            const SizedBox(height: 16),
+
+                            _label('CLIENT TOKEN'),
+                            _textField(
+                              _serverTokenController,
+                              hint: 'pinchc_...',
+                              obscure: true,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Auth token from gateway startup log (clientAuthToken). Leave empty for LAN.',
                               style:
                                   _mono.copyWith(fontSize: 8, color: TvaColors.txt3),
                             ),
@@ -390,9 +409,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         child: Text(text, style: _labelStyle),
       );
 
-  Widget _textField(TextEditingController controller, {String? hint}) {
+  Widget _textField(TextEditingController controller, {String? hint, bool obscure = false}) {
     return TextField(
       controller: controller,
+      obscureText: obscure,
       style: _mono.copyWith(fontSize: 13, color: TvaColors.txt),
       onChanged: (_) => _markDirty(),
       decoration: InputDecoration(

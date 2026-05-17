@@ -34,8 +34,11 @@ class LocalConnection implements ConnectionService {
 
   @override
   Future<void> connect(String host, int port, {String? authToken}) async {
-    _baseUrl = 'http://$host:$port';
-    _wsUrl = 'ws://$host:$port/ws';
+    final scheme = (host != 'localhost' && host != '127.0.0.1') ? 'wss' : 'ws';
+    final httpScheme = scheme == 'wss' ? 'https' : 'http';
+    _baseUrl = '$httpScheme://$host${port == 443 || port == 80 ? '' : ':$port'}';
+    final tokenParam = authToken != null ? '?token=${Uri.encodeComponent(authToken)}' : '';
+    _wsUrl = '$scheme://$host${port == 443 || port == 80 ? '' : ':$port'}/ws$tokenParam';
     _dio = Dio(BaseOptions(
       baseUrl: _baseUrl,
       connectTimeout: const Duration(seconds: 5),

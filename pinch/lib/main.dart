@@ -15,7 +15,8 @@ void main() async {
   final container = ProviderContainer();
 
   final conn = container.read(connectionServiceProvider);
-  conn.connect(settings.serverHost, settings.serverPort);
+  conn.connect(settings.serverHost, settings.serverPort,
+      authToken: settings.serverToken.isNotEmpty ? settings.serverToken : null);
 
   runApp(
     UncontrolledProviderScope(

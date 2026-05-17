@@ -12,6 +12,7 @@ class UserSettings {
   final bool worktree;
   final String serverHost;
   final int serverPort;
+  final String serverToken;
 
   const UserSettings({
     this.defaultProjectDir,
@@ -22,6 +23,7 @@ class UserSettings {
     this.worktree = false,
     this.serverHost = 'localhost',
     this.serverPort = 7464,
+    this.serverToken = '',
   });
 
   factory UserSettings.fromJson(Map<String, dynamic> json) => UserSettings(
@@ -34,6 +36,7 @@ class UserSettings {
         worktree: json['worktree'] as bool? ?? false,
         serverHost: json['serverHost'] as String? ?? 'localhost',
         serverPort: json['serverPort'] as int? ?? 7464,
+        serverToken: json['serverToken'] as String? ?? '',
       );
 
   Map<String, dynamic> toJson() => {
@@ -45,6 +48,7 @@ class UserSettings {
         'worktree': worktree,
         'serverHost': serverHost,
         'serverPort': serverPort,
+        'serverToken': serverToken,
       };
 
   UserSettings copyWith({
@@ -56,6 +60,7 @@ class UserSettings {
     bool? worktree,
     String? serverHost,
     int? serverPort,
+    String? serverToken,
   }) =>
       UserSettings(
         defaultProjectDir: defaultProjectDir ?? this.defaultProjectDir,
@@ -67,6 +72,7 @@ class UserSettings {
         worktree: worktree ?? this.worktree,
         serverHost: serverHost ?? this.serverHost,
         serverPort: serverPort ?? this.serverPort,
+        serverToken: serverToken ?? this.serverToken,
       );
 }
 
