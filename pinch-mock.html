@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PINCH — Dual View Mock</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #060503;
+      --bg1:       #0D0B08;
+      --bg2:       #131009;
+      --bg3:       #1A1510;
+      --amber:     #C08818;
+      --amber-dim: #7A5510;
+      --orange:    #D77757;
+      --text:      #DDD0B8;
+      --text-dim:  #8A7A60;
+      --text-muted:#4A3E2E;
+      --green:     #52902C;
+      --red:       #C03828;
+      --cyan:      #3E8480;
+      --blue:      #4488DD;
+      --magenta:   #8855CC;
+      --rail-w:    44px;
+    }
+
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: 13px; overflow: hidden; }
+
+    body::after {
+      content: '';
+      position: fixed; inset: 0;
+      background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.025) 2px, rgba(0,0,0,0.025) 4px);
+      pointer-events: none; z-index: 1000;
+    }
+
+    .app { display: flex; flex-direction: column; height: 100vh; }
+
+    /* ── Masthead ── */
+    .masthead {
+      display: flex; align-items: center; gap: 10px;
+      padding: 0 12px; height: 40px;
+      background: var(--bg1); border-bottom: 1px solid var(--bg3);
+      flex-shrink: 0;
+    }
+    .masthead-sprite {
+      display: grid; grid-template-columns: repeat(8, 4px); grid-template-rows: repeat(8, 4px); gap: 1px;
+      flex-shrink: 0;
+    }
+    .sc { width: 4px; height: 4px; border-radius: 0.5px; }
+    .masthead-title { font-size: 11px; font-weight: 600; letter-spacing: 0.18em; color: var(--amber); }
+    .masthead-divider { color: var(--text-muted); font-size: 10px; }
+    .masthead-session { font-size: 11px; color: var(--text-dim); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .masthead-meta { display: flex; gap: 14px; align-items: center; font-size: 10px; color: var(--text-dim); }
+    .meta-timer { font-weight: 500; color: var(--text); font-variant-numeric: tabular-nums; letter-spacing: 0.05em; }
+    .meta-tok { color: var(--text-dim); }
+    .meta-cost { color: var(--amber-dim); }
+    .conn-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--green); box-shadow: 0 0 6px var(--green);
+      animation: pulse-dot 2.5s ease-in-out infinite;
+    }
+    @keyframes pulse-dot { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+
+    /* ── Ticker ── */
+    .ticker {
+      height: 22px; background: var(--bg2);
+      border-bottom: 1px solid var(--amber-dim);
+      overflow: hidden; position: relative;
+      display: flex; align-items: center; flex-shrink: 0;
+    }
+    .ticker-badge {
+      position: absolute; left: 0; top: 0; bottom: 0;
+      padding: 0 8px; background: var(--amber); color: var(--bg);
+      font-size: 9px; font-weight: 600; letter-spacing: 0.12em;
+      display: flex; align-items: center; z-index: 1; white-space: nowrap;
+    }
+    .ticker-track {
+      padding-left: 52px; white-space: nowrap;
+      font-size: 10px; color: var(--text-dim);
+      animation: ticker-roll 50s linear infinite;
+    }
+    .te { margin-right: 40px; }
+    .te-k { color: var(--amber); margin-right: 4px; }
+    .te-tool { color: var(--blue); margin-right: 4px; }
+    .te-ok { color: var(--green); margin-right: 4px; }
+    @keyframes ticker-roll { from { transform: translateX(100vw); } to { transform: translateX(-200%); } }
+
+    /* ── Body ── */
+    .body-row { display: flex; flex: 1; overflow: hidden; }
+
+    /* ── Rail ── */
+    .rail {
+      width: var(--rail-w); background: var(--bg1);
+      border-right: 1px solid var(--bg3);
+      display: flex; flex-direction: column; align-items: center;
+      padding: 8px 0; gap: 2px; flex-shrink: 0;
+    }
+    .rail-btn {
+      width: 30px; height: 30px; border-radius: 3px;
+      border: none; background: transparent; color: var(--text-muted);
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      font-size: 15px; position: relative; transition: background 0.12s, color 0.12s;
+    }
+    .rail-btn:hover { background: var(--bg3); color: var(--text-dim); }
+    .rail-btn.active { color: var(--amber); }
+    .rail-btn.active::before {
+      content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+      width: 2px; height: 14px; background: var(--amber); border-radius: 0 1px 1px 0;
+    }
+    .rail-spacer { flex: 1; }
+
+    /* ── Main ── */
+    .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+    /* ── Session bar ── */
+    .session-bar {
+      display: flex; align-items: center; gap: 8px;
+      padding: 0 12px; height: 34px;
+      background: var(--bg1); border-bottom: 1px solid var(--bg3); flex-shrink: 0;
+    }
+    .corner-tag {
+      padding: 2px 6px; border: 1px solid var(--amber-dim); border-radius: 2px;
+      font-size: 9px; font-weight: 600; letter-spacing: 0.1em; color: var(--amber);
+    }
+    .corner-tag::before { content: '⌐'; margin-right: 3px; opacity: 0.6; }
+    .sb-name { font-size: 11px; color: var(--text-dim); flex: 1; }
+
+    .view-toggle {
+      display: flex; gap: 1px; background: var(--bg); border: 1px solid var(--bg3); border-radius: 2px; padding: 2px;
+    }
+    .vbtn {
+      padding: 3px 9px; border: none; border-radius: 1px;
+      background: transparent; color: var(--text-muted);
+      font-family: inherit; font-size: 9px; font-weight: 600; letter-spacing: 0.1em;
+      cursor: pointer; transition: background 0.1s, color 0.1s;
+    }
+    .vbtn:hover { color: var(--text-dim); }
+    .vbtn.active { background: var(--amber); color: var(--bg); }
+
+    /* ── Pane container ── */
+    .pane-container { flex: 1; display: flex; overflow: hidden; }
+
+    .pane { display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+    .pane-pty { flex: 0 0 50%; background: var(--bg); }
+    .pane-chan { flex: 1; background: var(--bg1); }
+    .pane.hidden { display: none; }
+    .pane.full { flex: 1 1 100%; }
+
+    .pane-header {
+      display: flex; align-items: center; gap: 6px;
+      padding: 0 10px; height: 26px;
+      background: var(--bg2); border-bottom: 1px solid var(--bg3);
+      font-size: 9px; font-weight: 600; letter-spacing: 0.2em; color: var(--text-muted);
+      flex-shrink: 0;
+    }
+    .ph-icon { font-size: 10px; }
+    .ph-spacer { flex: 1; }
+    .traffic { display: flex; gap: 4px; align-items: center; }
+    .tl { width: 7px; height: 7px; border-radius: 50%; }
+    .tl-r { background: #3A1510; border: 1px solid #6A2520; }
+    .tl-y { background: #3A2E10; border: 1px solid #6A5020; }
+    .tl-g { background: #1A3010; border: 1px solid #2A5A20; }
+
+    /* ── Terminal ── */
+    .terminal {
+      flex: 1; overflow-y: auto; padding: 10px 12px;
+      font-size: 12px; line-height: 1.55; color: var(--text);
+      scrollbar-width: thin; scrollbar-color: var(--bg3) transparent;
+    }
+    .terminal::-webkit-scrollbar { width: 4px; }
+    .terminal::-webkit-scrollbar-thumb { background: var(--bg3); border-radius: 2px; }
+    .tl-line { white-space: pre; }
+    .tc { }
+    .tc-dim    { color: var(--text-muted); }
+    .tc-bdr    { color: var(--text-muted); }
+    .tc-amber  { color: var(--amber); }
+    .tc-org    { color: var(--orange); font-weight: 600; }
+    .tc-green  { color: var(--green); }
+    .tc-red    { color: var(--red); }
+    .tc-cyan   { color: var(--cyan); }
+    .tc-blue   { color: var(--blue); }
+    .tc-mag    { color: var(--magenta); }
+    .tc-bold   { font-weight: 600; }
+    .tc-logo   { color: var(--amber); font-weight: 600; }
+    .tc-path   { color: var(--cyan); }
+    .tc-user-p { color: var(--orange); }
+    .tc-ok     { color: var(--green); font-weight: 600; }
+    .tc-err    { color: var(--red); font-weight: 600; }
+    .tc-think  { color: var(--text-dim); font-style: italic; }
+    .tc-tool   { color: var(--blue); font-weight: 500; }
+    .tc-sub    { color: var(--text-muted); }
+    .tc-num    { color: var(--magenta); font-variant-numeric: tabular-nums; }
+    .term-cur  { display: inline-block; width: 7px; height: 13px; background: var(--amber); vertical-align: text-bottom; animation: cb 1.2s step-end infinite; }
+    @keyframes cb { 50% { opacity: 0; } }
+
+    /* ── Resizer ── */
+    .resizer { width: 4px; background: var(--bg3); cursor: col-resize; flex-shrink: 0; transition: background 0.15s; }
+    .resizer:hover, .resizer.dragging { background: var(--amber-dim); }
+
+    /* ── Channel ── */
+    .channel-events {
+      flex: 1; overflow-y: auto; padding: 10px 10px 0;
+      display: flex; flex-direction: column; gap: 6px;
+      scrollbar-width: thin; scrollbar-color: var(--bg3) transparent;
+    }
+    .channel-events::-webkit-scrollbar { width: 4px; }
+    .channel-events::-webkit-scrollbar-thumb { background: var(--bg3); border-radius: 2px; }
+
+    /* ── Events ── */
+    .ev { border-radius: 2px; overflow: hidden; border: 1px solid var(--bg3); }
+    .ev-hdr {
+      display: flex; align-items: center; gap: 6px;
+      padding: 4px 8px; background: var(--bg2); border-bottom: 1px solid var(--bg3);
+      font-size: 9px; font-weight: 600; letter-spacing: 0.1em;
+    }
+    .ev-hdr-ts { margin-left: auto; color: var(--text-muted); font-weight: 400; font-size: 9px; }
+    .ev-body { padding: 7px 8px; font-size: 11.5px; line-height: 1.65; }
+    .ev-body p { }
+    .ev-body p + p { margin-top: 4px; }
+
+    .badge {
+      display: inline-block; padding: 1px 5px; border-radius: 1px;
+      font-size: 8px; font-weight: 600; letter-spacing: 0.1em;
+    }
+    .b-user   { background: var(--orange); color: var(--bg); }
+    .b-claude { background: var(--amber);  color: var(--bg); }
+    .b-tool   { background: var(--blue);   color: var(--bg); }
+    .b-result { background: var(--cyan);   color: var(--bg); }
+    .b-think  { background: var(--magenta);color: var(--bg); }
+    .b-perm   { background: var(--red);    color: var(--bg); }
+
+    .ev-user   { border-color: rgba(215,119,87,0.4); }
+    .ev-user .ev-hdr { border-color: rgba(215,119,87,0.3); }
+    .ev-claude { border-color: rgba(192,136,24,0.35); }
+    .ev-claude .ev-hdr { border-color: rgba(192,136,24,0.3); }
+    .ev-tool   { border-color: rgba(68,136,221,0.35); }
+    .ev-tool .ev-hdr { border-color: rgba(68,136,221,0.3); }
+    .ev-result { border-color: rgba(62,132,128,0.35); }
+    .ev-result .ev-hdr { border-color: rgba(62,132,128,0.3); }
+    .ev-think  { border-color: rgba(136,85,204,0.35); }
+    .ev-think .ev-hdr { border-color: rgba(136,85,204,0.3); }
+    .ev-perm   { border-color: rgba(192,56,40,0.5); }
+    .ev-perm .ev-hdr { border-color: rgba(192,56,40,0.4); animation: perm-flash 1s ease 3; }
+    @keyframes perm-flash { 0%,100%{background:var(--bg2);} 50%{background:rgba(192,56,40,0.12);} }
+
+    .tool-row { font-size: 11px; color: var(--text-dim); }
+    .tool-row + .tool-row { margin-top: 2px; }
+    .tr-key { color: var(--text-muted); }
+    .tr-val { color: var(--cyan); }
+    .tr-meta { color: var(--text-muted); font-size: 10px; }
+
+    .result-ok  { color: var(--green); margin-right: 5px; font-size: 10px; }
+    .result-err { color: var(--red);   margin-right: 5px; font-size: 10px; }
+    .result-msg { color: var(--text-dim); font-size: 11px; }
+
+    .perm-desc { color: var(--text); margin-bottom: 8px; }
+    .perm-cmd  { color: var(--cyan); font-weight: 500; }
+    .perm-btns { display: flex; gap: 5px; }
+    .perm-btn  {
+      padding: 4px 12px; border-radius: 2px; border: 1px solid;
+      font-family: inherit; font-size: 9px; font-weight: 600; letter-spacing: 0.08em;
+      cursor: pointer; transition: opacity 0.1s;
+    }
+    .perm-btn:hover { opacity: 0.8; }
+    .pb-allow  { background: var(--green);  border-color: var(--green);  color: var(--bg); }
+    .pb-deny   { background: transparent;   border-color: var(--red);    color: var(--red); }
+    .pb-always { background: transparent;   border-color: var(--amber);  color: var(--amber); }
+
+    .think-toggle-btn {
+      margin-left: auto; background: none; border: none; color: var(--text-muted);
+      font-family: inherit; font-size: 9px; cursor: pointer; letter-spacing: 0.05em;
+    }
+    .think-toggle-btn:hover { color: var(--text-dim); }
+    .think-body { overflow: hidden; transition: max-height 0.2s ease, padding 0.2s ease; }
+    .think-body.collapsed { max-height: 0 !important; padding-top: 0 !important; padding-bottom: 0 !important; }
+    .think-text { color: var(--text-dim); font-style: italic; font-size: 11px; line-height: 1.65; }
+
+    .think-tok { margin-left: auto; color: var(--text-muted); font-size: 9px; font-weight: 400; }
+
+    .typing-row {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 10px; border-radius: 2px;
+      border: 1px solid var(--bg3); background: var(--bg2); margin-bottom: 10px;
+    }
+    .typing-dots { display: flex; gap: 4px; }
+    .typing-dot {
+      width: 5px; height: 5px; border-radius: 50%; background: var(--amber);
+      animation: tdot 1.4s ease-in-out infinite;
+    }
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes tdot { 0%,60%,100%{transform:translateY(0);opacity:0.35;} 30%{transform:translateY(-4px);opacity:1;} }
+    .typing-label { font-size: 10px; color: var(--text-muted); }
+
+    /* ── Input bar ── */
+    .input-bar {
+      display: flex; gap: 6px; align-items: flex-end;
+      padding: 8px 10px; border-top: 1px solid var(--bg3);
+      background: var(--bg); flex-shrink: 0;
+    }
+    .input-field {
+      flex: 1; background: var(--bg2); border: 1px solid var(--bg3); border-radius: 2px;
+      padding: 7px 10px; color: var(--text);
+      font-family: inherit; font-size: 12px;
+      resize: none; min-height: 34px; max-height: 100px;
+      outline: none; transition: border-color 0.15s;
+    }
+    .input-field:focus { border-color: var(--amber-dim); }
+    .input-field::placeholder { color: var(--text-muted); }
+    .input-send {
+      width: 34px; height: 34px; border-radius: 2px;
+      border: 1px solid var(--amber-dim); background: transparent;
+      color: var(--amber); font-size: 15px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.1s, color 0.1s; flex-shrink: 0;
+    }
+    .input-send:hover { background: var(--amber); color: var(--bg); }
+
+    /* ── Status bar ── */
+    .status-bar {
+      display: flex; align-items: center; gap: 10px;
+      padding: 0 12px; height: 22px;
+      background: var(--bg2); border-top: 1px solid var(--bg3);
+      font-size: 9px; color: var(--text-muted); letter-spacing: 0.05em; flex-shrink: 0;
+    }
+    .sb-sep { opacity: 0.25; }
+    .sb-model { color: var(--amber); }
+    .sb-perm  { color: var(--red); }
+    .sb-ok    { color: var(--green); }
+    .sb-right { margin-left: auto; display: flex; gap: 10px; }
+    .sb-tok   { font-variant-numeric: tabular-nums; }
+
+    code.p { color: var(--cyan); font-size: 10.5px; }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ── Masthead ── -->
+  <header class="masthead">
+    <div class="masthead-sprite" id="sprite"></div>
+    <span class="masthead-title">PINCH</span>
+    <span class="masthead-divider">/</span>
+    <span class="masthead-session">markets-widget · ClaudeCode</span>
+    <div class="masthead-meta">
+      <span class="meta-timer" id="timer">00:04:12</span>
+      <span class="meta-tok"><span id="tokCount">47,291</span> tok</span>
+      <span class="meta-cost">$<span id="cost">0.023</span></span>
+      <div class="conn-dot"></div>
+    </div>
+  </header>
+
+  <!-- ── Ticker ── -->
+  <div class="ticker">
+    <div class="ticker-badge">LIVE</div>
+    <div class="ticker-track">
+      <span class="te"><span class="te-k">PROMPT</span>Build markets widget — BTC/ETH/SOL/XMR CoinGecko, 5-min cache</span>
+      <span class="te"><span class="te-k">THINK</span>34 tokens</span>
+      <span class="te"><span class="te-tool">Read</span>src/lib/server/widgets/weather.ts · 87 lines</span>
+      <span class="te"><span class="te-tool">Write</span>src/lib/server/widgets/markets.ts · 158 lines</span>
+      <span class="te"><span class="te-tool">Write</span>src/routes/api/widgets/markets/+server.ts · 24 lines</span>
+      <span class="te"><span class="te-tool">Write</span>src/components/widgets/MarketsWidget.svelte · 86 lines</span>
+      <span class="te"><span class="te-tool">Edit</span>src/routes/+page.server.ts</span>
+      <span class="te"><span class="te-tool">Edit</span>src/routes/+page.svelte</span>
+      <span class="te"><span class="te-tool">Bash</span>pnpm build</span>
+      <span class="te"><span class="te-ok">✓</span>Build passed in 3.2s · 0 type errors</span>
+    </div>
+  </div>
+
+  <!-- ── Body ── -->
+  <div class="body-row">
+
+    <!-- ── Rail ── -->
+    <nav class="rail">
+      <button class="rail-btn active" title="Sessions">⌘</button>
+      <button class="rail-btn" title="History">◷</button>
+      <button class="rail-btn" title="Projects">◈</button>
+      <div class="rail-spacer"></div>
+      <button class="rail-btn" title="Settings">⚙</button>
+    </nav>
+
+    <!-- ── Main ── -->
+    <div class="main">
+
+      <!-- ── Session bar ── -->
+      <div class="session-bar">
+        <span class="corner-tag">markets-widget</span>
+        <span class="sb-name">ClaudeCode / pinch</span>
+        <div class="view-toggle">
+          <button class="vbtn active" id="vSplit" onclick="setView('split')">SPLIT</button>
+          <button class="vbtn" id="vTty"  onclick="setView('tty')">TTY</button>
+          <button class="vbtn" id="vChan" onclick="setView('chan')">CHAN</button>
+        </div>
+      </div>
+
+      <!-- ── Panes ── -->
+      <div class="pane-container" id="paneContainer">
+
+        <!-- PTY pane -->
+        <div class="pane pane-pty" id="panepty">
+          <div class="pane-header">
+            <span class="ph-icon">⬛</span>
+            <span>TTY</span>
+            <span class="ph-spacer"></span>
+            <div class="traffic">
+              <div class="tl tl-r"></div>
+              <div class="tl tl-y"></div>
+              <div class="tl tl-g"></div>
+            </div>
+          </div>
+          <div class="terminal" id="terminal"></div>
+        </div>
+
+        <!-- Resizer -->
+        <div class="resizer" id="resizer"></div>
+
+        <!-- Channel pane -->
+        <div class="pane pane-chan" id="panechan">
+          <div class="pane-header">
+            <span class="ph-icon">◈</span>
+            <span>CHANNEL</span>
+          </div>
+          <div class="channel-events" id="chanEvents">
+
+            <!-- User message -->
+            <div class="ev ev-user">
+              <div class="ev-hdr">
+                <span class="badge b-user">USER</span>
+                <span>YOU</span>
+                <span class="ev-hdr-ts">04:12</span>
+              </div>
+              <div class="ev-body">
+                <p>Build the markets widget for Dash — BTC/ETH/SOL/XMR with CoinGecko free API, 5-minute cache, 24h change percentage.</p>
+              </div>
+            </div>
+
+            <!-- Thinking block -->
+            <div class="ev ev-think">
+              <div class="ev-hdr">
+                <span class="badge b-think">THINK</span>
+                <span>Thinking</span>
+                <span class="think-tok">34 tok</span>
+                <button class="think-toggle-btn" id="thinkBtn" onclick="toggleThink()">▼ HIDE</button>
+              </div>
+              <div class="ev-body think-body" id="thinkBody" style="max-height:200px">
+                <p class="think-text">I need to hit CoinGecko's free /simple/price endpoint — no API key needed. Coin IDs: bitcoin, ethereum, solana, monero. Cache for 5 minutes using a module-level timestamp pattern. Match the shape of weather.ts: exported typed interface, a fetchMarkets() function, null on error. Then I need the API route at /api/widgets/markets with auth check, the Svelte 5 runes widget, and wiring into page.server.ts + page.svelte.</p>
+              </div>
+            </div>
+
+            <!-- Tool: Read -->
+            <div class="ev ev-tool">
+              <div class="ev-hdr">
+                <span class="badge b-tool">TOOL</span>
+                <span class="tc-tool">Read</span>
+              </div>
+              <div class="ev-body">
+                <div class="tool-row"><span class="tr-key">path: </span><span class="tr-val">src/lib/server/widgets/weather.ts</span></div>
+              </div>
+            </div>
+
+            <!-- Result: Read -->
+            <div class="ev ev-result">
+              <div class="ev-hdr">
+                <span class="badge b-result">RESULT</span>
+                <span>Read</span>
+              </div>
+              <div class="ev-body">
+                <span class="result-ok">✓</span><span class="result-msg">87 lines — cache pattern and export shape noted</span>
+              </div>
+            </div>
+
+            <!-- Tool: Write markets.ts -->
+            <div class="ev ev-tool">
+              <div class="ev-hdr">
+                <span class="badge b-tool">TOOL</span>
+                <span class="tc-tool">Write</span>
+              </div>
+              <div class="ev-body">
+                <div class="tool-row"><span class="tr-key">file_path: </span><span class="tr-val">src/lib/server/widgets/markets.ts</span></div>
+                <div class="tool-row"><span class="tr-key">content: </span><span class="tr-meta">158 lines</span></div>
+              </div>
+            </div>
+
+            <!-- Result: Write -->
+            <div class="ev ev-result">
+              <div class="ev-hdr">
+                <span class="badge b-result">RESULT</span>
+                <span>Write</span>
+              </div>
+              <div class="ev-body">
+                <span class="result-ok">✓</span><span class="result-msg">markets.ts created</span>
+              </div>
+            </div>
+
+            <!-- Tool: Write route -->
+            <div class="ev ev-tool">
+              <div class="ev-hdr">
+                <span class="badge b-tool">TOOL</span>
+                <span class="tc-tool">Write</span>
+              </div>
+              <div class="ev-body">
+                <div class="tool-row"><span class="tr-key">file_path: </span><span class="tr-val">src/routes/api/widgets/markets/+server.ts</span></div>
+                <div class="tool-row"><span class="tr-key">content: </span><span class="tr-meta">24 lines</span></div>
+              </div>
+            </div>
+
+            <!-- Result: Write -->
+            <div class="ev ev-result">
+              <div class="ev-hdr">
+                <span class="badge b-result">RESULT</span>
+                <span>Write</span>
+              </div>
+              <div class="ev-body">
+                <span class="result-ok">✓</span><span class="result-msg">API route created</span>
+              </div>
+            </div>
+
+            <!-- Tool: Write Svelte widget -->
+            <div class="ev ev-tool">
+              <div class="ev-hdr">
+                <span class="badge b-tool">TOOL</span>
+                <span class="tc-tool">Write</span>
+              </div>
+              <div class="ev-body">
+                <div class="tool-row"><span class="tr-key">file_path: </span><span class="tr-val">src/components/widgets/MarketsWidget.svelte</span></div>
+                <div class="tool-row"><span class="tr-key">content: </span><span class="tr-meta">86 lines</span></div>
+              </div>
+            </div>
+
+            <!-- Result: Write -->
+            <div class="ev ev-result">
+              <div class="ev-hdr">
+                <span class="badge b-result">RESULT</span>
+                <span>Write</span>
+              </div>
+              <div class="ev-body">
+                <span class="result-ok">✓</span><span class="result-msg">MarketsWidget.svelte created</span>
+              </div>
+            </div>
+
+            <!-- Tool: Edit page.server.ts -->
+            <div class="ev ev-tool">
+              <div class="ev-hdr">
+                <span class="badge b-tool">TOOL</span>
+                <span class="tc-tool">Edit</span>
+              </div>
+              <div class="ev-body">
+                <div class="tool-row"><span class="tr-key">file_path: </span><span class="tr-val">src/routes/+page.server.ts</span></div>
+                <div class="tool-row"><span class="tr-key">change: </span><span class="tr-meta">+import fetchMarkets, wire into Promise.all</span></div>
+              </div>
+            </div>
+
+            <!-- Result: Edit -->
+            <div class="ev ev-result">
+              <div class="ev-hdr">
+                <span class="badge b-result">RESULT</span>
+                <span>Edit</span>
+              </div>
+              <div class="ev-body">
+                <span class="result-ok">✓</span><span class="result-msg">page.server.ts updated</span>
+              </div>
+            </div>
+
+            <!-- Permission: Bash -->
+            <div class="ev ev-perm" id="permEv">
+              <div class="ev-hdr">
+                <span class="badge b-perm">PERM</span>
+                <span>Permission Required</span>
+              </div>
+              <div class="ev-body">
+                <p class="perm-desc">Run shell command: <span class="perm-cmd">pnpm build</span></p>
+                <div class="perm-btns">
+                  <button class="perm-btn pb-allow" onclick="grantPerm()">ALLOW</button>
+                  <button class="perm-btn pb-deny"  onclick="denyPerm()">DENY</button>
+                  <button class="perm-btn pb-always" onclick="grantPerm()">ALWAYS</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Claude response -->
+            <div class="ev ev-claude">
+              <div class="ev-hdr">
+                <span class="badge b-claude">CLAUDE</span>
+                <span>Response</span>
+                <span class="ev-hdr-ts">04:28</span>
+              </div>
+              <div class="ev-body">
+                <p>Markets widget is live. Three files created:</p>
+                <p>• <code class="p">src/lib/server/widgets/markets.ts</code> — CoinGecko fetcher, 5-min cache</p>
+                <p>• <code class="p">src/routes/api/widgets/markets/+server.ts</code> — auth-gated route</p>
+                <p>• <code class="p">src/components/widgets/MarketsWidget.svelte</code> — price rows with 24h Δ</p>
+                <p style="margin-top:6px">Wired into page layout. Build passed — 0 type errors.</p>
+              </div>
+            </div>
+
+            <!-- Typing indicator -->
+            <div class="typing-row">
+              <div class="typing-dots">
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+              </div>
+              <span class="typing-label">Claude is working…</span>
+            </div>
+
+          </div>
+
+          <!-- Input -->
+          <div class="input-bar">
+            <textarea class="input-field" placeholder="Message Claude…" rows="1" onkeydown="handleKey(event)"></textarea>
+            <button class="input-send" title="Send">↑</button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ── Status bar ── -->
+      <div class="status-bar">
+        <span class="sb-model">claude-opus-4-5</span>
+        <span class="sb-sep">|</span>
+        <span class="sb-perm">⚡ BYPASS</span>
+        <span class="sb-sep">|</span>
+        <span>8 tools</span>
+        <span class="sb-sep">|</span>
+        <span class="sb-tok" id="sbTok">47,291 tok</span>
+        <div class="sb-right">
+          <span class="sb-ok">● CONNECTED</span>
+          <span>localhost:3000</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── Clawd sprite ──
+  // 0=empty, 1=amber (body), 2=orange (eyes), 3=dim-amber
+  const PIXELS = [
+    [0,0,1,1,1,1,0,0],
+    [0,1,1,1,1,1,1,0],
+    [1,1,2,2,2,2,1,1],
+    [1,1,1,1,1,1,1,1],
+    [1,1,1,3,3,1,1,1],
+    [0,1,1,1,1,1,1,0],
+    [0,0,1,3,3,1,0,0],
+    [0,0,1,1,1,1,0,0],
+  ];
+  const PIX_COLORS = { 0:'transparent', 1:'#C08818', 2:'#D77757', 3:'#7A5510' };
+  const sprite = document.getElementById('sprite');
+  for (const row of PIXELS) {
+    for (const v of row) {
+      const c = document.createElement('div');
+      c.className = 'sc';
+      c.style.background = PIX_COLORS[v];
+      sprite.appendChild(c);
+    }
+  }
+
+  // ── Timer ──
+  let seconds = 4 * 60 + 12;
+  function fmtTime(s) {
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), ss = s % 60;
+    if (h > 0) return String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':' + String(ss).padStart(2,'0');
+    return String(m).padStart(2,'0') + ':' + String(ss).padStart(2,'0');
+  }
+  setInterval(() => {
+    seconds++;
+    document.getElementById('timer').textContent = fmtTime(seconds);
+  }, 1000);
+
+  // ── Token flicker ──
+  let tokBase = 47291;
+  setInterval(() => {
+    const bump = Math.random() < 0.3 ? Math.floor(Math.random() * 400 + 50) : 0;
+    if (bump) {
+      tokBase += bump;
+      const v = tokBase.toLocaleString();
+      document.getElementById('tokCount').textContent = v;
+      document.getElementById('sbTok').textContent = v + ' tok';
+      // cost update
+      const c = (tokBase * 0.000015 / 1000 * 3).toFixed(3);
+      document.getElementById('cost').textContent = c;
+    }
+  }, 800);
+
+  // ── Terminal animation ──
+  // Each line: array of [text, cssClass] segments
+  const T_LINES = [
+    [['$ ', 'tc-dim'], ['claude --dangerously-skip-permissions', 'tc-path']],
+    [['', '']],
+    [['╭─────────────────────────────────────────────────────────────╮', 'tc-bdr']],
+    [['│ ', 'tc-bdr'], ['◆ ', 'tc-amber'], ['Claude Code', 'tc-logo'], ['                    claude.ai/code  ', 'tc-dim'], ['│', 'tc-bdr']],
+    [['╰─────────────────────────────────────────────────────────────╯', 'tc-bdr']],
+    [['', '']],
+    [['  ⚡ ', 'tc-red'], ['BYPASS permissions mode active', 'tc-bold']],
+    [['', '']],
+    [['  ', ''], ['/path/to/dev/dash', 'tc-cyan']],
+    [['', '']],
+    [['  ', 'tc-dim'], ['> ', 'tc-orange'], ['Build the markets widget — BTC/ETH/SOL/XMR', '']],
+    [['    ', ''], ['CoinGecko free API, 5-min cache, 24h change %.', 'tc-dim']],
+    [['', '']],
+    [['  ', ''], ['⠸ ', 'tc-amber'], ['Thinking…', 'tc-think']],
+    [['', '']],
+    [['  ', ''], ['● ', 'tc-blue'], ['Read', 'tc-tool'], ['(', 'tc-dim'], ['src/lib/server/widgets/weather.ts', 'tc-path'], [')', 'tc-dim']],
+    [['    ⎿  ', 'tc-sub'], ['87 lines', 'tc-num']],
+    [['', '']],
+    [['  ', ''], ['● ', 'tc-blue'], ['Write', 'tc-tool'], ['(', 'tc-dim'], ['src/lib/server/widgets/markets.ts', 'tc-path'], [')', 'tc-dim']],
+    [['    ⎿  ', 'tc-sub'], ['Wrote ', 'tc-dim'], ['158', 'tc-num'], [' lines', 'tc-dim']],
+    [['', '']],
+    [['  ', ''], ['● ', 'tc-blue'], ['Write', 'tc-tool'], ['(', 'tc-dim'], ['src/routes/api/widgets/markets/+server.ts', 'tc-path'], [')', 'tc-dim']],
+    [['    ⎿  ', 'tc-sub'], ['Wrote ', 'tc-dim'], ['24', 'tc-num'], [' lines', 'tc-dim']],
+    [['', '']],
+    [['  ', ''], ['● ', 'tc-blue'], ['Write', 'tc-tool'], ['(', 'tc-dim'], ['src/components/widgets/MarketsWidget.svelte', 'tc-path'], [')', 'tc-dim']],
+    [['    ⎿  ', 'tc-sub'], ['Wrote ', 'tc-dim'], ['86', 'tc-num'], [' lines', 'tc-dim']],
+    [['', '']],
+    [['  ', ''], ['● ', 'tc-blue'], ['Edit', 'tc-tool'], ['(', 'tc-dim'], ['src/routes/+page.server.ts', 'tc-path'], [')', 'tc-dim']],
+    [['    ⎿  ', 'tc-sub'], ['Edited', 'tc-dim']],
+    [['', '']],
+    [['  ', ''], ['● ', 'tc-blue'], ['Bash', 'tc-tool'], ['(', 'tc-dim'], ['pnpm build', 'tc-path'], [')', 'tc-dim']],
+    [['    ⎿  ', 'tc-sub'], ['> dash@0.0.1 build', 'tc-dim']],
+    [['    ', ''], ['   > vite build', 'tc-dim']],
+    [['    ', ''], ['   ', ''], ['✓ ', 'tc-green'], ['built in ', 'tc-dim'], ['3.2s', 'tc-num']],
+    [['', '']],
+    [['  ', ''], ['Markets widget is live. Three files created, wired into', '']],
+    [['  ', ''], ['page layout. Build passed — 0 type errors.', '']],
+    [['', '']],
+    [['  ', 'tc-dim'], ['> ', 'tc-orange']],
+  ];
+
+  const termEl = document.getElementById('terminal');
+  let lineIdx = 0;
+  let cursorEl = null;
+
+  function buildLine(segs) {
+    const div = document.createElement('div');
+    div.className = 'tl-line';
+    for (const [txt, cls] of segs) {
+      if (!txt) continue;
+      const span = document.createElement('span');
+      span.textContent = txt;
+      if (cls) span.className = cls;
+      div.appendChild(span);
+    }
+    return div;
+  }
+
+  function addNextLine() {
+    if (lineIdx >= T_LINES.length) {
+      // Add blinking cursor at end
+      if (!cursorEl) {
+        const lastLine = termEl.lastElementChild;
+        if (lastLine) {
+          cursorEl = document.createElement('span');
+          cursorEl.className = 'term-cur';
+          lastLine.appendChild(cursorEl);
+        }
+      }
+      return;
+    }
+    const segs = T_LINES[lineIdx++];
+    const div = buildLine(segs);
+    termEl.appendChild(div);
+    termEl.scrollTop = termEl.scrollHeight;
+    const delay = lineIdx < 6 ? 90 : lineIdx < 14 ? 35 : lineIdx < 20 ? 20 : 12;
+    setTimeout(addNextLine, delay);
+  }
+  setTimeout(addNextLine, 300);
+
+  // ── View toggle ──
+  const BTNS = { split:'vSplit', tty:'vTty', chan:'vChan' };
+  let curView = 'split';
+
+  function setView(v) {
+    curView = v;
+    for (const [k, id] of Object.entries(BTNS)) {
+      document.getElementById(id).classList.toggle('active', k === v);
+    }
+    const pty  = document.getElementById('panepty');
+    const chan  = document.getElementById('panechan');
+    const res  = document.getElementById('resizer');
+    if (v === 'split') {
+      pty.classList.remove('hidden','full'); pty.style.flex = '0 0 50%';
+      chan.classList.remove('hidden','full'); chan.style.flex = '1';
+      res.style.display = '';
+    } else if (v === 'tty') {
+      pty.classList.remove('hidden'); pty.style.flex = '1';
+      chan.classList.add('hidden'); chan.style.flex = '';
+      res.style.display = 'none';
+    } else {
+      pty.classList.add('hidden'); pty.style.flex = '';
+      chan.classList.remove('hidden'); chan.style.flex = '1';
+      res.style.display = 'none';
+    }
+  }
+
+  // ── Resizer drag ──
+  const resizer = document.getElementById('resizer');
+  const container = document.getElementById('paneContainer');
+  let dragging = false, startX = 0, startFlex = 50;
+
+  resizer.addEventListener('mousedown', e => {
+    dragging = true;
+    startX = e.clientX;
+    const pty = document.getElementById('panepty');
+    startFlex = pty.getBoundingClientRect().width / container.getBoundingClientRect().width * 100;
+    resizer.classList.add('dragging');
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    const dx = e.clientX - startX;
+    const totalW = container.getBoundingClientRect().width;
+    const newPct = Math.min(80, Math.max(20, startFlex + dx / totalW * 100));
+    document.getElementById('panepty').style.flex = '0 0 ' + newPct + '%';
+    startX = e.clientX;
+    startFlex = newPct;
+  });
+  document.addEventListener('mouseup', () => {
+    dragging = false;
+    resizer.classList.remove('dragging');
+  });
+
+  // ── Think toggle ──
+  let thinkOpen = true;
+  function toggleThink() {
+    thinkOpen = !thinkOpen;
+    const body = document.getElementById('thinkBody');
+    const btn  = document.getElementById('thinkBtn');
+    if (thinkOpen) {
+      body.classList.remove('collapsed');
+      body.style.maxHeight = '200px';
+      btn.textContent = '▼ HIDE';
+    } else {
+      body.classList.add('collapsed');
+      body.style.maxHeight = '0';
+      btn.textContent = '▶ SHOW';
+    }
+  }
+
+  // ── Permission buttons ──
+  function grantPerm() {
+    const ev = document.getElementById('permEv');
+    ev.style.opacity = '0.45';
+    ev.style.pointerEvents = 'none';
+  }
+  function denyPerm() {
+    const ev = document.getElementById('permEv');
+    ev.style.opacity = '0.45';
+    ev.style.pointerEvents = 'none';
+    ev.style.borderColor = 'rgba(192,56,40,0.2)';
+  }
+
+  // ── Input auto-resize ──
+  document.querySelector('.input-field').addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = Math.min(100, this.scrollHeight) + 'px';
+  });
+
+  function handleKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+    }
+  }
+</script>
+</body>
+</html>

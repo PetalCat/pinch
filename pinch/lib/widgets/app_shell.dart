@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../providers/active_session_provider.dart';
-import '../providers/clawd_state_provider.dart';
 import '../theme/tva_colors.dart';
 import 'masthead.dart';
 import 'panel_corners.dart';
@@ -117,9 +116,9 @@ class AppShell extends ConsumerWidget {
           BottomNavigationBarItem(
               icon: Icon(Icons.chat_bubble_outline), label: 'SESSIONS'),
           BottomNavigationBarItem(
-              icon: Icon(Icons.description_outlined), label: 'DOCS'),
+              icon: Icon(Icons.smart_toy_outlined), label: 'AGENTS'),
           BottomNavigationBarItem(
-              icon: Icon(Icons.folder_outlined), label: 'FILES'),
+              icon: Icon(Icons.history_outlined), label: 'HISTORY'),
           BottomNavigationBarItem(
               icon: Icon(Icons.settings_outlined), label: 'SETTINGS'),
         ],
@@ -129,10 +128,11 @@ class AppShell extends ConsumerWidget {
 
   int _getCurrentIndex(BuildContext context) {
     final location = GoRouterState.of(context).uri.toString();
-    if (location.startsWith('/session')) return 0;
-    if (location.startsWith('/docs')) return 1;
+    if (location.startsWith('/session') || location == '/home') return 0;
+    if (location.startsWith('/agents')) return 1;
+    if (location.startsWith('/history')) return 2;
     if (location == '/settings') return 3;
-    return 0; // home = sessions tab
+    return 0;
   }
 
   void _onTabTap(BuildContext context, int index) {
@@ -140,9 +140,9 @@ class AppShell extends ConsumerWidget {
       case 0:
         GoRouter.of(context).go('/home');
       case 1:
-        GoRouter.of(context).go('/docs');
+        GoRouter.of(context).go('/agents');
       case 2:
-        GoRouter.of(context).go('/home'); // files not a separate route yet
+        GoRouter.of(context).go('/history');
       case 3:
         GoRouter.of(context).go('/settings');
     }

@@ -72,7 +72,6 @@ class _PinchTerminalViewState extends State<PinchTerminalView> {
   static const _reset = '\x1b[0m';
   static const _bold = '\x1b[1m';
   static const _dim = '\x1b[2m';
-  static const _italic = '\x1b[3m';
   // Colors matching Claude Code's theme
   static const _clawd = '\x1b[38;2;215;119;87m'; // clawd orange
   static const _amber = '\x1b[38;2;192;136;24m';

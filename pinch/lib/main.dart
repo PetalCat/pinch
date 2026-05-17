@@ -12,7 +12,7 @@ void main() {
 
   // Auto-connect to local server (fire and forget — app works without it)
   final conn = container.read(connectionServiceProvider);
-  conn.connect('localhost', 3847);
+  conn.connect('localhost', 7464);
 
   runApp(
     UncontrolledProviderScope(

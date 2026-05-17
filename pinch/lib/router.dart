@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'screens/agents_screen.dart';
 import 'screens/docs_screen.dart';
 import 'screens/history_screen.dart';
 import 'screens/home_screen.dart';
@@ -57,6 +58,13 @@ final routerProvider = Provider<GoRouter>((ref) {
             pageBuilder: (context, state) => const NoTransitionPage(
               key: ValueKey('history'),
               child: HistoryScreen(),
+            ),
+          ),
+          GoRoute(
+            path: '/agents',
+            pageBuilder: (context, state) => const NoTransitionPage(
+              key: ValueKey('agents'),
+              child: AgentsScreen(),
             ),
           ),
         ],

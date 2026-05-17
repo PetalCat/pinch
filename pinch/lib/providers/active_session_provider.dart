@@ -15,6 +15,7 @@ class ActiveSessionNotifier extends StateNotifier<List<SessionEvent>> {
   final Ref _ref;
   StreamSubscription<SessionEvent>? _sub;
   Timer? _elapsedTimer;
+  bool _disposed = false;
 
   ActiveSessionNotifier(this._ref) : super([]) {
     final conn = _ref.read(connectionServiceProvider);
@@ -106,7 +107,7 @@ class ActiveSessionNotifier extends StateNotifier<List<SessionEvent>> {
   void _startElapsedTimer() {
     _elapsedTimer?.cancel();
     _elapsedTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted) return;
+      if (_disposed) return;
       final current = _ref.read(sessionMetaProvider);
       if (!current.isEnded) {
         _ref.read(sessionMetaProvider.notifier).state = current.copyWith(
@@ -130,6 +131,7 @@ class ActiveSessionNotifier extends StateNotifier<List<SessionEvent>> {
 
   @override
   void dispose() {
+    _disposed = true;
     _sub?.cancel();
     _stopElapsedTimer();
     super.dispose();
