@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/agent.dart';
 import '../models/session_event.dart';
 import '../models/session_options.dart';
 import '../models/session.dart';
@@ -36,6 +37,14 @@ abstract class ConnectionService {
   Future<String> createPtySession(String projectDir, {int cols = 120, int rows = 40, String? model, bool dangerouslySkipPermissions = false});
   void sendPtyInput(String sessionId, String data);
   void sendPtyResize(String sessionId, int cols, int rows);
+
+  // Agent management
+  Stream<Map<String, dynamic>> get agentEventStream;
+  Future<List<Agent>> getAgents();
+  Future<void> startAgent(String agentId);
+  Future<void> stopAgent(String agentId);
+  Future<void> deleteAgent(String agentId);
+  Future<Map<String, dynamic>> provisionAgent(String agentId);
 }
 
 final connectionServiceProvider = Provider<ConnectionService>((ref) {

@@ -8,8 +8,8 @@ import 'diff_block.dart';
 import 'permission_bar.dart';
 import 'result_block.dart';
 import 'thinking_block.dart';
+import 'subagent_panel.dart';
 import 'tool_row.dart';
-import 'user_message.dart';
 
 class TimelineView extends StatefulWidget {
   final List<SessionEvent> events;
@@ -103,25 +103,47 @@ class _TimelineViewState extends State<TimelineView> {
       );
     }
 
+    // Precompute subagent tracking: toolUseId → toolResult, and which IDs are Agent calls
+    final Map<String, SessionEvent> toolResults = {};
+    final Set<String> agentToolUseIds = {};
+    for (final e in widget.events) {
+      if (e.type == EventType.toolResult) {
+        final id = e.data['toolUseId'] as String?;
+        if (id != null) toolResults[id] = e;
+      }
+      if (e.type == EventType.toolUse && e.data['toolName'] == 'Agent') {
+        final id = e.data['toolUseId'] as String?;
+        if (id != null) agentToolUseIds.add(id);
+      }
+    }
+
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
       itemCount: widget.events.length,
       itemBuilder: (context, index) {
         final event = widget.events[index];
+        // Suppress toolResult events that are rendered inside a SubagentPanel
+        if (event.type == EventType.toolResult) {
+          final id = event.data['toolUseId'] as String?;
+          if (id != null && agentToolUseIds.contains(id)) {
+            return const SizedBox.shrink();
+          }
+        }
         final isNew = _seenEventIds.add(event.id);
         return _FadeInWrapper(
           animate: isNew,
           child: _TimelineNode(
             event: event,
-            child: _buildEventWidget(event, index),
+            child: _buildEventWidget(event, index, toolResults, agentToolUseIds),
           ),
         );
       },
     );
   }
 
-  Widget? _buildEventWidget(SessionEvent event, int index) {
+  Widget? _buildEventWidget(SessionEvent event, int index,
+      Map<String, SessionEvent> toolResults, Set<String> agentToolUseIds) {
     return switch (event.type) {
       EventType.userMessage => _UserBlock(text: event.data['text'] as String? ?? ''),
       EventType.assistantText => ClaudeMessage(
@@ -133,7 +155,7 @@ class _TimelineViewState extends State<TimelineView> {
           text: event.data['thinking'] as String? ?? '',
           isDone: _isThinkingDone(index),
         ),
-      EventType.toolUse => ToolRow(event: event),
+      EventType.toolUse => _buildToolUse(event, toolResults, agentToolUseIds),
       EventType.toolResult => _buildResult(event),
       EventType.permissionRequest => PermissionBar(
           event: event,
@@ -151,6 +173,18 @@ class _TimelineViewState extends State<TimelineView> {
       EventType.turnComplete => _TurnCompleteBlock(event: event),
       _ => null,
     };
+  }
+
+  Widget _buildToolUse(SessionEvent event, Map<String, SessionEvent> toolResults,
+      Set<String> agentToolUseIds) {
+    final toolUseId = event.data['toolUseId'] as String?;
+    if (toolUseId != null && agentToolUseIds.contains(toolUseId)) {
+      return SubagentPanel(
+        toolUse: event,
+        result: toolResults[toolUseId],
+      );
+    }
+    return ToolRow(event: event);
   }
 
   Widget _buildResult(SessionEvent event) {

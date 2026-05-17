@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import '../models/agent.dart';
 import '../models/session_event.dart';
 import '../models/session_options.dart';
 import '../models/session.dart';
@@ -180,4 +181,24 @@ class MockConnectionService implements ConnectionService {
   @override
   void sendPtyResize(String sessionId, int cols, int rows) {}
 
+  // ── Agent stubs ──────────────────────────────────────────────────────────────
+
+  @override
+  Stream<Map<String, dynamic>> get agentEventStream => const Stream.empty();
+
+  @override
+  Future<List<Agent>> getAgents() async => [];
+
+  @override
+  Future<void> startAgent(String agentId) async {}
+
+  @override
+  Future<void> stopAgent(String agentId) async {}
+
+  @override
+  Future<void> deleteAgent(String agentId) async {}
+
+  @override
+  Future<Map<String, dynamic>> provisionAgent(String agentId) async =>
+      {'matrixUserId': null, 'provisioned': false};
 }

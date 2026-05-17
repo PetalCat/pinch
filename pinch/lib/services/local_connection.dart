@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
+import '../models/agent.dart';
 import '../models/session_event.dart';
 import '../models/session_options.dart';
 import '../models/session.dart';
@@ -17,15 +18,14 @@ class LocalConnection implements ConnectionService {
   ConnectionStatus _status = ConnectionStatus.disconnected;
   String _baseUrl = '';
   String _wsUrl = '';
-  String _host = '';
-  int _port = 0;
   Completer<String>? _sessionIdCompleter;
   Completer<String>? _ptySessionIdCompleter;
   Timer? _reconnectTimer;
   int _reconnectAttempts = 0;
 
-  final _eventController = StreamController<SessionEvent>.broadcast();
-  final _ptyController = StreamController<Map<String, dynamic>>.broadcast();
+  final _eventController      = StreamController<SessionEvent>.broadcast();
+  final _ptyController        = StreamController<Map<String, dynamic>>.broadcast();
+  final _agentEventController = StreamController<Map<String, dynamic>>.broadcast();
 
   @override
   Stream<ConnectionStatus> get statusStream => _statusController.stream;
@@ -34,8 +34,6 @@ class LocalConnection implements ConnectionService {
 
   @override
   Future<void> connect(String host, int port, {String? authToken}) async {
-    _host = host;
-    _port = port;
     _baseUrl = 'http://$host:$port';
     _wsUrl = 'ws://$host:$port/ws';
     _dio = Dio(BaseOptions(
@@ -72,6 +70,11 @@ class LocalConnection implements ConnectionService {
             // Route PTY messages to PTY stream
             if (type == 'ptyData' || type == 'ptyExit') {
               _ptyController.add(json);
+              return;
+            }
+            // Route agent/node events to agent stream
+            if (type == 'agentStatus' || type == 'nodeStatus' || type == 'nodeState') {
+              _agentEventController.add(json);
               return;
             }
             if (type == 'ptySessionCreated') {
@@ -341,6 +344,44 @@ class LocalConnection implements ConnectionService {
     } catch (_) {
       return [];
     }
+  }
+
+  // ── Agent methods ──────────────────────────────────────────────────────────
+
+  @override
+  Stream<Map<String, dynamic>> get agentEventStream => _agentEventController.stream;
+
+  @override
+  Future<List<Agent>> getAgents() async {
+    try {
+      final resp = await _dio.get('/api/agents');
+      return (resp.data as List)
+          .map((j) => Agent.fromJson(j as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  @override
+  Future<void> startAgent(String agentId) async {
+    await _dio.post('/api/agents/$agentId/start');
+  }
+
+  @override
+  Future<void> stopAgent(String agentId) async {
+    await _dio.post('/api/agents/$agentId/stop');
+  }
+
+  @override
+  Future<void> deleteAgent(String agentId) async {
+    await _dio.delete('/api/agents/$agentId');
+  }
+
+  @override
+  Future<Map<String, dynamic>> provisionAgent(String agentId) async {
+    final resp = await _dio.post('/api/agents/$agentId/provision');
+    return resp.data as Map<String, dynamic>;
   }
 
 }
