@@ -4,15 +4,18 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'providers/connection_provider.dart';
 import 'router.dart';
+import 'services/settings_service.dart';
 import 'theme/tva_theme.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   GoogleFonts.config.allowRuntimeFetching = false;
+
+  final settings = await SettingsService().load();
   final container = ProviderContainer();
 
-  // Auto-connect to local server (fire and forget — app works without it)
   final conn = container.read(connectionServiceProvider);
-  conn.connect('localhost', 7464);
+  conn.connect(settings.serverHost, settings.serverPort);
 
   runApp(
     UncontrolledProviderScope(

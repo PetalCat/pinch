@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/agent.dart';
 import '../providers/agent_provider.dart';
+import '../providers/nodes_provider.dart';
 import '../theme/tva_colors.dart';
 
 class AgentsScreen extends ConsumerWidget {
@@ -13,14 +14,19 @@ class AgentsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final agents = ref.watch(agentsProvider);
+    final nodes  = ref.watch(nodesProvider);
 
     return Scaffold(
       backgroundColor: TvaColors.bg,
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _Header(onRefresh: () => ref.read(agentsProvider.notifier).refresh()),
+          _Header(onRefresh: () {
+            ref.read(agentsProvider.notifier).refresh();
+            ref.read(nodesProvider.notifier).refresh();
+          }),
           Container(height: 1, color: TvaColors.brd),
+          if (nodes.isNotEmpty) _NodesBanner(nodes: nodes),
           Expanded(
             child: agents.when(
               loading: () => const Center(child: _LoadingDot()),
@@ -38,6 +44,78 @@ class AgentsScreen extends ConsumerWidget {
                       itemBuilder: (context, i) =>
                           _AgentTile(agent: list[i]),
                     ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NodesBanner extends StatelessWidget {
+  final List<ConnectedNode> nodes;
+  const _NodesBanner({required this.nodes});
+
+  static const _mono = TextStyle(fontFamily: 'IBMPlexMono');
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: TvaColors.bgPanel,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          Text(
+            'NODES',
+            style: _mono.copyWith(
+              fontSize: 8,
+              color: TvaColors.txt3,
+              letterSpacing: 2,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Wrap(
+            spacing: 8,
+            children: nodes.map((n) => _NodeBadge(node: n)).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NodeBadge extends StatelessWidget {
+  final ConnectedNode node;
+  const _NodeBadge({required this.node});
+
+  static const _mono = TextStyle(fontFamily: 'IBMPlexMono');
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: TvaColors.bgInset,
+        border: Border.all(color: TvaColors.greenBr.withAlpha(120)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 5,
+            height: 5,
+            decoration: const BoxDecoration(
+              color: TvaColors.greenBr,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            node.name,
+            style: _mono.copyWith(
+              fontSize: 9,
+              color: TvaColors.txt2,
+              letterSpacing: 1,
             ),
           ),
         ],

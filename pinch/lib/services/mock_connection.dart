@@ -201,4 +201,7 @@ class MockConnectionService implements ConnectionService {
   @override
   Future<Map<String, dynamic>> provisionAgent(String agentId) async =>
       {'matrixUserId': null, 'provisioned': false};
+
+  @override
+  Future<List<Map<String, dynamic>>> getNodes() async => [];
 }

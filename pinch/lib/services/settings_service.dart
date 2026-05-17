@@ -10,6 +10,8 @@ class UserSettings {
   final String effort;
   final bool dangerouslySkipPermissions;
   final bool worktree;
+  final String serverHost;
+  final int serverPort;
 
   const UserSettings({
     this.defaultProjectDir,
@@ -18,6 +20,8 @@ class UserSettings {
     this.effort = 'high',
     this.dangerouslySkipPermissions = false,
     this.worktree = false,
+    this.serverHost = 'localhost',
+    this.serverPort = 7464,
   });
 
   factory UserSettings.fromJson(Map<String, dynamic> json) => UserSettings(
@@ -28,6 +32,8 @@ class UserSettings {
         dangerouslySkipPermissions:
             json['dangerouslySkipPermissions'] as bool? ?? false,
         worktree: json['worktree'] as bool? ?? false,
+        serverHost: json['serverHost'] as String? ?? 'localhost',
+        serverPort: json['serverPort'] as int? ?? 7464,
       );
 
   Map<String, dynamic> toJson() => {
@@ -37,6 +43,8 @@ class UserSettings {
         'effort': effort,
         'dangerouslySkipPermissions': dangerouslySkipPermissions,
         'worktree': worktree,
+        'serverHost': serverHost,
+        'serverPort': serverPort,
       };
 
   UserSettings copyWith({
@@ -46,6 +54,8 @@ class UserSettings {
     String? effort,
     bool? dangerouslySkipPermissions,
     bool? worktree,
+    String? serverHost,
+    int? serverPort,
   }) =>
       UserSettings(
         defaultProjectDir: defaultProjectDir ?? this.defaultProjectDir,
@@ -55,6 +65,8 @@ class UserSettings {
         dangerouslySkipPermissions:
             dangerouslySkipPermissions ?? this.dangerouslySkipPermissions,
         worktree: worktree ?? this.worktree,
+        serverHost: serverHost ?? this.serverHost,
+        serverPort: serverPort ?? this.serverPort,
       );
 }
 

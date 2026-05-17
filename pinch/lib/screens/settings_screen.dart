@@ -16,6 +16,7 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   late TextEditingController _projectDirController;
   late TextEditingController _systemPromptController;
+  late TextEditingController _serverHostController;
   String _model = 'auto';
   String _permissionMode = 'default';
   String _effort = 'high';
@@ -38,17 +39,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     super.initState();
     _projectDirController = TextEditingController();
     _systemPromptController = TextEditingController();
+    _serverHostController = TextEditingController();
   }
 
   @override
   void dispose() {
     _projectDirController.dispose();
     _systemPromptController.dispose();
+    _serverHostController.dispose();
     super.dispose();
   }
 
   void _loadFrom(UserSettings s) {
     _projectDirController.text = s.defaultProjectDir ?? '';
+    _serverHostController.text = s.serverHost;
     _model = s.model;
     _permissionMode = s.permissionMode;
     _effort = s.effort;
@@ -72,6 +76,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       effort: _effort,
       dangerouslySkipPermissions: _dangerouslySkipPermissions,
       worktree: _worktree,
+      serverHost: _serverHostController.text.trim().isEmpty
+          ? 'localhost'
+          : _serverHostController.text.trim(),
     );
     await ref.read(settingsProvider.notifier).save(settings);
     setState(() => _dirty = false);
@@ -178,6 +185,40 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            // Gateway
+                            Text(
+                              'GATEWAY',
+                              style: _mono.copyWith(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: TvaColors.amber,
+                                letterSpacing: 2,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Pinch gateway server address. Restart the app after changing.',
+                              style: _mono.copyWith(
+                                  fontSize: 10, color: TvaColors.txt3),
+                            ),
+                            const SizedBox(height: 24),
+
+                            _label('SERVER HOST'),
+                            _textField(
+                              _serverHostController,
+                              hint: 'localhost',
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Hostname or IP of the Pinch gateway.',
+                              style:
+                                  _mono.copyWith(fontSize: 8, color: TvaColors.txt3),
+                            ),
+                            const SizedBox(height: 24),
+
+                            Container(height: 1, color: TvaColors.brd),
+                            const SizedBox(height: 24),
+
                             // Quick Session Defaults
                             Text(
                               'QUICK SESSION DEFAULTS',
